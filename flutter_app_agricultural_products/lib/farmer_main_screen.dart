@@ -67,7 +67,7 @@ class _FarmerMainScreenState extends State<FarmerMainScreen> {
               ),
             ),
             Text(
-              "Pione Farm",
+              "3TML Farm",
               style: TextStyle(fontSize: 14, color: Colors.white70),
             ),
           ],
