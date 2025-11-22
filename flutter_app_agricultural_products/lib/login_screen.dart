@@ -2,9 +2,13 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'signup_screen.dart'; // Import màn hình đăng ký
 import 'home_screen.dart';
-// import 'transporter_main_screen.dart';
 import 'farmer_main_screen.dart';
+import 'transporter_main_screen.dart';
+// import 'transporter_main_screen.dart'; // Nếu bạn đã tạo file này
+
+const Color kPrimaryColor = Color(0xFF00C853); // Màu xanh chủ đạo
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,17 +18,19 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  // Giống như API base URL của bạn
+  // IP máy ảo Android
   final String _baseUrl = 'http://10.0.2.2:5000/api/auth';
 
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
 
+  // Hàm xử lý đăng nhập (Giữ nguyên logic phân quyền)
   Future<void> _login() async {
-    // 1. Kiểm tra xem backend của bạn dùng /login hay /signin nhé!
-    // Mình sẽ đoán là /login
-    final Uri loginUrl = Uri.parse('$_baseUrl/login');
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+      _showMsg("Vui lòng nhập đầy đủ thông tin", isError: true);
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -32,7 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final response = await http.post(
-        loginUrl,
+        Uri.parse('$_baseUrl/login'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'email': _emailController.text,
@@ -43,44 +49,40 @@ class _LoginScreenState extends State<LoginScreen> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final String token = data['token'];
-        // 1. Lấy Role từ phản hồi
         final String role = data['user']['role'];
 
-        // 2. Lưu Token và Role vào bộ nhớ máy (để lần sau mở app tự vào đúng chỗ)
+        // Lưu token và role
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('token', token);
         await prefs.setString('role', role);
 
-        // 3. Điều hướng dựa trên Role (Logic quan trọng nhất)
         if (mounted) {
+          _showMsg("Đăng nhập thành công!", isError: false);
+
+          // Điều hướng dựa trên Role
           Widget nextScreen;
           switch (role) {
             case 'farmer':
-              nextScreen =
-                  const FarmerMainScreen(); // Giao diện riêng cho Nông dân
+              nextScreen = const FarmerMainScreen();
               break;
             case 'transporter':
-            // case 'manager': // Giả sử manager cũng làm vận chuyển
-            //   nextScreen =
-            //       const TransporterMainScreen(); // Giao diện riêng cho Vận chuyển
-            //   break;
+              nextScreen = const TransporterMainScreen();
+              break;
             default:
-              nextScreen = const HomeScreen(); // Giao diện Người tiêu dùng
+              nextScreen = const HomeScreen();
           }
 
-          // Chuyển màn hình và xóa hết lịch sử lùi lại (để không back về login được)
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (context) => nextScreen),
             (route) => false,
           );
         }
       } else {
-        // Hiển thị lỗi (giống toast.error)
         final errorData = jsonDecode(response.body);
-        _showErrorDialog(errorData['error'] ?? 'Đăng nhập thất bại');
+        _showMsg(errorData['msg'] ?? 'Đăng nhập thất bại', isError: true);
       }
     } catch (e) {
-      _showErrorDialog('Lỗi kết nối: ${e.toString()}');
+      _showMsg('Lỗi kết nối: $e', isError: true);
     } finally {
       setState(() {
         _isLoading = false;
@@ -88,43 +90,179 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _showErrorDialog(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Colors.red),
-      );
-    }
+  void _showMsg(String msg, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: isError ? Colors.red : kPrimaryColor,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Đăng Nhập')),
-      body: Padding(
+      // AppBar cùng màu xanh
+      appBar: AppBar(
+        title: const Text("Đăng Nhập"),
+        backgroundColor: kPrimaryColor,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            TextField(
-              controller: _emailController,
-              decoration: const InputDecoration(labelText: 'Email'),
-              keyboardType: TextInputType.emailAddress,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _passwordController,
-              decoration: const InputDecoration(labelText: 'Mật khẩu'),
-              obscureText: true,
-            ),
             const SizedBox(height: 30),
-            _isLoading
-                ? const CircularProgressIndicator()
-                : ElevatedButton(
-                    onPressed: _login,
-                    child: const Text('Đăng Nhập'),
+            // Logo hoặc Icon trang trí
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: kPrimaryColor.withOpacity(0.1),
+              ),
+              child: const Icon(Icons.spa, size: 80, color: kPrimaryColor),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              "Chào mừng trở lại!",
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              "Đăng nhập để quản lý nông trại của bạn",
+              style: TextStyle(fontSize: 14, color: Colors.grey),
+            ),
+            const SizedBox(height: 40),
+
+            // Ô nhập Email (Style mới)
+            _buildTextField(
+              controller: _emailController,
+              label: "Email",
+              icon: Icons.email,
+              inputType: TextInputType.emailAddress,
+            ),
+            const SizedBox(height: 20),
+
+            // Ô nhập Password (Style mới)
+            _buildTextField(
+              controller: _passwordController,
+              label: "Mật khẩu",
+              icon: Icons.lock,
+              isPassword: true,
+            ),
+
+            const SizedBox(height: 10),
+            // Quên mật khẩu
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () {},
+                child: const Text(
+                  "Quên mật khẩu?",
+                  style: TextStyle(
+                    color: kPrimaryColor,
+                    fontWeight: FontWeight.bold,
                   ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 30),
+
+            // Nút Đăng Nhập
+            _isLoading
+                ? const CircularProgressIndicator(color: kPrimaryColor)
+                : SizedBox(
+                    width: double.infinity,
+                    height: 55,
+                    child: ElevatedButton(
+                      onPressed: _login,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: kPrimaryColor, // Màu xanh
+                        foregroundColor: Colors.white, // Chữ trắng
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 2,
+                      ),
+                      child: const Text(
+                        "ĐĂNG NHẬP",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+
+            const SizedBox(height: 20),
+
+            // Chuyển sang trang Đăng ký
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text(
+                  "Chưa có tài khoản? ",
+                  style: TextStyle(color: Colors.grey),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const SignUpScreen(),
+                      ),
+                    );
+                  },
+                  child: const Text(
+                    "Đăng ký ngay",
+                    style: TextStyle(
+                      color: kPrimaryColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  // Widget tái sử dụng để ô nhập liệu đẹp giống trang Đăng ký
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    bool isPassword = false,
+    TextInputType inputType = TextInputType.text,
+  }) {
+    return TextField(
+      controller: controller,
+      obscureText: isPassword,
+      keyboardType: inputType,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, color: kPrimaryColor),
+        // Viền khi chưa bấm vào
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade400),
+        ),
+        // Viền khi đang bấm vào (Màu xanh)
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: kPrimaryColor, width: 2),
+        ),
+        filled: true,
+        fillColor: Colors.white,
       ),
     );
   }
