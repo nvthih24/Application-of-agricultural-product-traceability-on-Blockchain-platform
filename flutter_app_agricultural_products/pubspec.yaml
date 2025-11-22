@@ -44,6 +44,7 @@ dependencies:
   mime: ^1.0.4 # (Thư viện phụ) Giúp http xác định loại file ảnh
 
   mobile_scanner: ^5.1.0 # Thư viện quét mã QR
+  url_launcher: ^6.1.11 # Mở trình duyệt web
 
 dev_dependencies:
   flutter_test:

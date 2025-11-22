@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'qr_scanner_screen.dart'; // Import màn hình quét QR cũ của bạn
 import 'farm_detail_screen.dart';
-import 'login_screen.dart';
+import 'profile_screen.dart';
 
 // Màu sắc chủ đạo lấy từ thiết kế của bạn
 const Color kPrimaryColor = Color(0xFF00C853); // Xanh lá
@@ -22,9 +22,9 @@ class _HomeScreenState extends State<HomeScreen> {
   // Danh sách các màn hình tương ứng với các Tab
   static final List<Widget> _widgetOptions = <Widget>[
     const HomeContent(), // Tab 0: Trang chủ (Code cũ nằm ở đây)
-    const Center(child: Text("Màn hình Yêu thích (Saved)")), // Tab 1
-    const Center(child: Text("Màn hình Đơn hàng (Orders)")), // Tab 2
-    const ProfileContent(), // Tab 3: Tài khoản & Đăng nhập (CÁI BẠN CẦN)
+    const Center(child: Text("Đang nâng cấp (Saved)")), // Tab 1
+    const Center(child: Text("Đang nâng cấp (Orders)")), // Tab 2
+    const ProfileScreen(), // Tab 3: Tài khoản & Đăng nhập (CÁI BẠN CẦN)
   ];
 
   void _onItemTapped(int index) {
@@ -67,58 +67,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// ==========================================
-// PHẦN 1: GIAO DIỆN PROFILE (Nơi chứa nút Đăng nhập)
-// ==========================================
-class ProfileContent extends StatelessWidget {
-  const ProfileContent({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.account_circle, size: 100, color: Colors.grey),
-          const SizedBox(height: 20),
-          const Text(
-            "Bạn chưa đăng nhập",
-            style: TextStyle(fontSize: 18, color: Colors.grey),
-          ),
-          const SizedBox(height: 30),
-
-          // NÚT ĐĂNG NHẬP Ở ĐÂY
-          ElevatedButton.icon(
-            onPressed: () {
-              // Chuyển sang màn hình LoginScreen
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
-              );
-            },
-            icon: const Icon(Icons.login),
-            label: const Text("Đăng nhập / Đăng ký"),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kPrimaryColor,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-            ),
-          ),
-
-          const SizedBox(height: 10),
-          const Text(
-            "(Dành cho Nông dân & Nhà vận chuyển)",
-            style: TextStyle(fontSize: 12, color: Colors.grey),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ============================
-// PHẦN 2: GIAO DIỆN TRANG CHỦ
-// ============================
+// ====================
+// GIAO DIỆN TRANG CHỦ
+// ====================
 class HomeContent extends StatelessWidget {
   const HomeContent({super.key});
   @override

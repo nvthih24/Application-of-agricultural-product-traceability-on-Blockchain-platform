@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'login_screen.dart'; // Import để chuyển về trang Login sau khi đăng ký xong
 
 const Color kPrimaryColor = Color(0xFF00C853); // Màu xanh chủ đạo
 

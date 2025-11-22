@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'login_screen.dart';
-import 'qr_scanner_screen.dart'; // Dùng lại màn hình quét mã
+import 'package:url_launcher/url_launcher.dart'; // Nhớ cài: flutter pub add url_launcher
+import 'qr_scanner_screen.dart';
+import 'home_screen.dart';
 
-// Màu chủ đạo: Xanh dương (Logistics)
 const Color kTransporterColor = Color(0xFF01579B);
-const Color kAccentColor = Color(0xFF0288D1);
 
 class TransporterMainScreen extends StatefulWidget {
   const TransporterMainScreen({super.key});
@@ -15,332 +14,373 @@ class TransporterMainScreen extends StatefulWidget {
 }
 
 class _TransporterMainScreenState extends State<TransporterMainScreen> {
-  // Dữ liệu giả lập lịch sử vận chuyển
-  final List<Map<String, dynamic>> history = [
+  // Dữ liệu giả lập
+  final List<Map<String, dynamic>> myShipments = [
     {
-      "id": "CAITHIA-001",
-      "action": "Nhận hàng (Pickup)",
+      "id": "CAITHIA-BATCH-001",
+      "name": "Cải thìa hữu cơ",
+      "location": "Kho A, KCN Tân Bình", // Địa chỉ để tìm trên Map
       "time": "10:30 AM",
-      "location": "Pione Farm, Khu A",
-      "status": "success",
+      "statusCode": 1, // 1: Đang vận chuyển
+      "status": "In Transit",
+      "image": "assets/images/farm_1.jpg",
     },
     {
-      "id": "DUAHAU-088",
-      "action": "Giao hàng (Delivery)",
+      "id": "DUAHAU-BATCH-088",
+      "name": "Dưa hấu Long An",
+      "location": "Siêu thị BigC",
       "time": "08:15 AM",
-      "location": "Kho lạnh số 2",
-      "status": "success",
-    },
-    {
-      "id": "CAM-002",
-      "action": "Nhận hàng",
-      "time": "Yesterday",
-      "location": "Nông trại Cam Bè",
-      "status": "pending",
+      "statusCode": 2, // 2: Đã giao
+      "status": "Completed",
+      "image": "assets/images/fruit.png",
     },
   ];
 
+  // --- HÀM MỞ MAP (ĐÃ SỬA URL CHUẨN) ---
+  Future<void> _openMap(String address) async {
+    // Tạo URL tìm kiếm địa điểm trên Google Maps
+    final Uri googleUrl = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(address)}',
+    );
+
+    try {
+      if (await canLaunchUrl(googleUrl)) {
+        await launchUrl(googleUrl, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Không tìm thấy ứng dụng bản đồ!")),
+          );
+      }
+    } catch (e) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Lỗi: $e")));
+    }
+  }
+
+  // --- CÁC HÀM DIALOG VÀ LOGOUT GIỮ NGUYÊN ---
+  // Hàm hiển thị hộp thoại xác nhận đăng xuất
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Đăng xuất"),
+          content: const Text(
+            "Bạn có chắc chắn muốn đăng xuất khỏi tài khoản không?",
+          ),
+          actions: [
+            // Nút 1: Quay lại (Hủy)
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context); // Đóng hộp thoại, không làm gì cả
+              },
+              child: const Text(
+                "Quay lại",
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
+
+            // Nút 2: Đăng xuất (Thực hiện)
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red, // Màu đỏ cảnh báo
+              ),
+              onPressed: () {
+                Navigator.pop(context); // Đóng hộp thoại trước
+                _logout(); // Gọi hàm đăng xuất thật
+              },
+              child: const Text(
+                "Đăng xuất",
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _logout() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    await prefs.clear(); // Xóa token đăng nhập
+
     if (mounted) {
+      // Xóa sạch lịch sử, quay về trang Home
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
         (route) => false,
       );
     }
   }
 
-  void _startScan() {
-    // Mở màn hình quét QR
-    // Lưu ý: Sau này chúng ta sẽ sửa logic chỗ này một chút
-    // để khi Transporter quét xong thì hiện Form "Cập nhật vận chuyển"
-    // thay vì hiện Chi tiết sản phẩm như người tiêu dùng.
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const QrScannerScreen()),
+  void _showUpdateConditionDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Cập nhật hành trình"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            TextField(
+              decoration: InputDecoration(
+                labelText: "Nhiệt độ (°C)",
+                prefixIcon: Icon(Icons.ac_unit),
+              ),
+            ),
+            SizedBox(height: 10),
+            TextField(
+              decoration: InputDecoration(
+                labelText: "Vị trí hiện tại",
+                prefixIcon: Icon(Icons.location_on),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Hủy"),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text("Đã cập nhật!")));
+            },
+            child: const Text("Lưu"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showConfirmDeliveryDialog(
+    BuildContext context,
+    Map<String, dynamic> item,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Xác nhận giao hàng"),
+        content: Text("Xác nhận đã giao đơn ${item['name']} thành công?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Hủy"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            onPressed: () {
+              Navigator.pop(context);
+              setState(() {
+                final index = myShipments.indexWhere(
+                  (e) => e['id'] == item['id'],
+                );
+                if (index != -1) {
+                  myShipments[index]['statusCode'] = 2;
+                  myShipments[index]['status'] = "Completed";
+                  myShipments[index]['location'] = "Giao thành công";
+                }
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("Giao hàng thành công!"),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            },
+            child: const Text(
+              "Xác nhận",
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-
-      // 1. Header
+      backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
         backgroundColor: kTransporterColor,
-        elevation: 0,
         title: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              "Dashboard Vận Chuyển",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
+            Text("Dashboard Vận Chuyển", style: TextStyle(fontSize: 18)),
             Text(
               "Tài xế: Nguyễn Văn A",
-              style: TextStyle(fontSize: 13, color: Colors.white70),
+              style: TextStyle(fontSize: 12, color: Colors.white70),
             ),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_none, color: Colors.white),
-            onPressed: () {},
-          ),
-          IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: _logout,
+            onPressed:
+                _showLogoutDialog, // Gọi hộp thoại thay vì gọi logout ngay
           ),
         ],
       ),
-
-      body: Column(
-        children: [
-          // 2. Khu vực Hành động chính (Quét QR)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: const BoxDecoration(
-              color: kTransporterColor,
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(30),
-                bottomRight: Radius.circular(30),
-              ),
-            ),
-            child: Column(
-              children: [
-                // Nút quét to đùng
-                GestureDetector(
-                  onTap: _startScan,
-                  child: Container(
-                    height: 150,
-                    width: 150,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 15,
-                          offset: const Offset(0, 5),
-                        ),
-                      ],
-                    ),
-                    child: const Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.qr_code_scanner,
-                          size: 60,
-                          color: kTransporterColor,
-                        ),
-                        SizedBox(height: 5),
-                        Text(
-                          "QUÉT ĐƠN",
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: kTransporterColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  "Di chuyển camera đến mã QR trên kiện hàng",
-                  style: TextStyle(color: Colors.white70),
-                ),
-                const SizedBox(height: 10),
-              ],
-            ),
-          ),
-
-          // 3. Thống kê nhanh
-          Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Row(
-              children: [
-                _buildStatCard(
-                  "Đã nhận",
-                  "15",
-                  Icons.inventory_2,
-                  Colors.orange,
-                ),
-                const SizedBox(width: 15),
-                _buildStatCard(
-                  "Đã giao",
-                  "42",
-                  Icons.local_shipping,
-                  Colors.green,
-                ),
-              ],
-            ),
-          ),
-
-          // 4. Lịch sử hoạt động
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "Hoạt động gần đây",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 10),
-
-                  // Danh sách cuộn
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: history.length,
-                      itemBuilder: (context, index) {
-                        final item = history[index];
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          padding: const EdgeInsets.all(15),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.grey.shade200),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue.shade50,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  item['action'].contains("Nhận")
-                                      ? Icons.input
-                                      : Icons.output,
-                                  color: kTransporterColor,
-                                ),
-                              ),
-                              const SizedBox(width: 15),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      item['id'],
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                    Text(
-                                      item['action'],
-                                      style: const TextStyle(
-                                        color: Colors.black87,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.location_on,
-                                          size: 12,
-                                          color: Colors.grey,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          item['location'],
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    item['time'],
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                  if (item['status'] == 'success')
-                                    const Icon(
-                                      Icons.check_circle,
-                                      color: Colors.green,
-                                      size: 18,
-                                    )
-                                  else
-                                    const Icon(
-                                      Icons.access_time_filled,
-                                      color: Colors.orange,
-                                      size: 18,
-                                    ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (c) => const QrScannerScreen()),
+        ),
+        backgroundColor: kTransporterColor,
+        icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
+        label: const Text(
+          "Quét Nhận Hàng",
+          style: TextStyle(color: Colors.white),
+        ),
+      ),
+      body: ListView.builder(
+        padding: const EdgeInsets.all(15),
+        itemCount: myShipments.length,
+        itemBuilder: (context, index) =>
+            _buildTransportCard(myShipments[index]),
       ),
     );
   }
 
-  Widget _buildStatCard(
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(15),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(15),
-          boxShadow: [
-            BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10),
-          ],
-        ),
-        child: Row(
+  // --- WIDGET CARD ĐÃ TỐI ƯU GIAO DIỆN ---
+  Widget _buildTransportCard(Map<String, dynamic> item) {
+    int status = item['statusCode'] ?? 1;
+    bool isInTransit = (status == 1);
+    String location = item['location'];
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 15),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
           children: [
-            Icon(icon, color: color, size: 30),
-            const SizedBox(width: 15),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            // 1. Phần thông tin
+            Row(
               children: [
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.asset(
+                    item['image'] ?? '',
+                    width: 70,
+                    height: 70,
+                    fit: BoxFit.cover,
+                    errorBuilder: (c, e, s) => Container(
+                      width: 70,
+                      height: 70,
+                      color: Colors.grey[300],
+                      child: const Icon(Icons.local_shipping),
+                    ),
                   ),
                 ),
-                Text(
-                  label,
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item['name'],
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        "ID: ${item['id']}",
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+
+                      // --- LOGIC NÚT MAP: NẰM GỌN Ở ĐÂY ---
+                      InkWell(
+                        onTap: isInTransit
+                            ? () => _openMap(location)
+                            : null, // Chỉ bấm được khi đang đi
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.location_on,
+                              size: 14,
+                              color: isInTransit ? Colors.red : Colors.green,
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                location,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: isInTransit
+                                      ? Colors.blue[800]
+                                      : Colors.black87,
+                                  fontWeight: isInTransit
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                  decoration: isInTransit
+                                      ? TextDecoration.underline
+                                      : TextDecoration
+                                            .none, // Gạch chân để biết là bấm được
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (isInTransit)
+                              const Icon(
+                                Icons.open_in_new,
+                                size: 12,
+                                color: Colors.blue,
+                              ), // Icon mũi tên nhỏ
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
+
+            // 2. Phần nút bấm (Chỉ hiện khi đang vận chuyển)
+            if (isInTransit) ...[
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showUpdateConditionDialog(context),
+                      icon: const Icon(Icons.thermostat, size: 18),
+                      label: const Text("Cập nhật"),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: kTransporterColor,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () =>
+                          _showConfirmDeliveryDialog(context, item),
+                      icon: const Icon(Icons.check, size: 18),
+                      label: const Text("Hoàn tất"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: kTransporterColor,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
