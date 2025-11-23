@@ -118,50 +118,6 @@ router.post("/bind-wallet", auth, async (req, res) => {
   }
 });
 
-// Lưu transaction (APP: backend ký thay)
-router.post("/transactions", auth, async (req, res) => {
-  const {
-    txHash,
-    productId,
-    action,
-    timestamp,
-    plantingImageUrl,
-    harvestImageUrl,
-    receiveImageUrl,
-    deliveryImageUrl,
-    managerReceiveImageUrl,
-  } = req.body;
-
-  // Bắt buộc có walletAddress vì backend ký thay
-  if (!req.user.walletAddress) {
-    return res.status(400).json({ msg: "User has no wallet address. Please bind wallet first." });
-  }
-
-  if (!txHash || !productId || !action || !timestamp) {
-    return res.status(400).json({ msg: "Missing required fields" });
-  }
-
-  try {
-    const transaction = new Transaction({
-      txHash,
-      productId,
-      userAddress: req.user.walletAddress,   // tự động lấy từ JWT
-      action,
-      timestamp,
-      plantingImageUrl,
-      harvestImageUrl,
-      receiveImageUrl,
-      deliveryImageUrl,
-      managerReceiveImageUrl,
-    });
-
-    await transaction.save();
-    res.status(201).json({ message: "Transaction saved successfully", txHash });
-  } catch (error) {
-    console.error("Error saving transaction:", error);
-    res.status(500).json({ error: "Failed to save transaction" });
-  }
-});
 
 // Các route còn lại (get users, get transactions…) giữ nguyên
 // ...

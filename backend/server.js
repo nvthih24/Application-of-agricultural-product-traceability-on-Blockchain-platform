@@ -5,6 +5,9 @@ const cors = require('cors');
 const authRoutes = require('./routes/auth');
 const uploadRoutes = require('./routes/upload');
 const qrCodeRoutes = require('./routes/qrcodes');
+const transactionRoutes = require('./routes/transaction.routes');
+const productRoutes = require('./routes/product.routes');
+
 
 dotenv.config();
 
@@ -18,6 +21,8 @@ app.use(cors());
 app.use('/api/upload', uploadRoutes);
 app.use('/api/qrcodes', qrCodeRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/auth/transactions", transactionRoutes);
+app.use("/api/products", productRoutes);
 
 mongoose
   .connect(process.env.MONGO_URI)

@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mime/mime.dart';
 import 'package:http_parser/http_parser.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class CareDiaryScreen extends StatefulWidget {
   final String productId;
@@ -84,6 +85,16 @@ class _CareDiaryScreenState extends State<CareDiaryScreen> {
       String? imageUrl;
       if (_careImage != null) {
         imageUrl = await _uploadImage(_careImage!);
+        if (imageUrl == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Lỗi upload ảnh'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          setState(() => _isLoading = false);
+          return;
+        }
       }
 
       final prefs = await SharedPreferences.getInstance();
@@ -96,32 +107,55 @@ class _CareDiaryScreenState extends State<CareDiaryScreen> {
           'Authorization': 'Bearer $token',
         },
         body: jsonEncode({
-          'action': 'logCare', // <--- Action mới cho Backend
-          'userAddress': 'pending',
-          'txHash': 'pending',
+          // 1. Sửa action cho đúng
+          "action": "logCare",
 
-          'productId': widget.productId,
-          'careType': _selectedActivity, // VD: "Bón phân"
-          'description': _descriptionController.text, // VD: "NPK 20-20-15"
-          'careDate': (DateTime.now().millisecondsSinceEpoch / 1000).floor(),
-          'careImageUrl': imageUrl ?? "",
+          // 2. ĐÚNG TÊN FIELD TRONG CONTRACT
+          "productId": widget.productId,
+          "careType": _selectedActivity,
+          "description": _descriptionController.text.trim(),
+          "careDate": (DateTime.now().millisecondsSinceEpoch / 1000).floor(),
+          "careImageUrl": imageUrl ?? "", // nếu không có ảnh thì để rỗng
+          "creatorPhone": prefs.getString('phone'), // lấy từ SharedPreferences
+          "creatorName": prefs.getString('name') ?? "Nông dân",
         }),
       );
 
+      // 3. Xử lý response chuẩn
       if (response.statusCode == 200 || response.statusCode == 201) {
+        final result = jsonDecode(response.body);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Đã ghi nhật ký thành công!'),
+          SnackBar(
+            content: Text(
+              "Ghi nhật ký thành công! Tx: ${result['txHash']?.substring(0, 10)}...",
+            ),
             backgroundColor: Colors.green,
+            action: result['txHash'] != null
+                ? SnackBarAction(
+                    label: "Xem",
+                    textColor: Colors.white,
+                    onPressed: () {
+                      // Mở explorer (ví dụ ZeroScan)
+                      launchUrl(
+                        Uri.parse(
+                          "https://zeroscan.org/tx/${result['txHash']}",
+                        ),
+                      );
+                    },
+                  )
+                : null,
           ),
         );
-        Navigator.pop(context);
+        Navigator.pop(context); // Quay lại dashboard
       } else {
-        throw Exception(jsonDecode(response.body)['error']);
+        final error = jsonDecode(response.body)['error'] ?? 'Lỗi server';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Lỗi: $error"), backgroundColor: Colors.red),
+        );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text("Lỗi kết nối: $e"), backgroundColor: Colors.red),
       );
     } finally {
       setState(() => _isLoading = false);

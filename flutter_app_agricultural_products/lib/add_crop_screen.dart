@@ -120,17 +120,17 @@ class _AddCropScreenState extends State<AddCropScreen> {
         },
         body: jsonEncode({
           'action': 'addProduct',
-          'txHash': 'pending_app_generated',
-          'userAddress': 'pending',
-
-          // Dữ liệu nghiệp vụ chuẩn
-          'productId': _batchIdController.text, // Dùng mã tự sinh
+          // 'txHash' và 'userAddress' không cần gửi nữa → backend tự xử lý
+          'productId': _batchIdController.text,
           'productName': _productNameController.text,
-          'farmName': _farmName, // Gửi tên nông trại lấy tự động
-          'seedSource': _seedSourceController.text, // THÊM MỚI
+          'farmName': _farmName,
+          'seedSource':
+              _seedSourceController.text, // tên field đúng với contract
           'plantingDate': (DateTime.now().millisecondsSinceEpoch / 1000)
               .floor(),
           'plantingImageUrl': imageUrl,
+          "creatorPhone": prefs.getString('phone'), // lấy từ SharedPreferences
+          "creatorName": prefs.getString('name') ?? "Nông dân",
         }),
       );
 
