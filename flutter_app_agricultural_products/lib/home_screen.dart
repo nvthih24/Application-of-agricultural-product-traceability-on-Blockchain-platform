@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'qr_scanner_screen.dart'; // Import màn hình quét QR cũ của bạn
 import 'farm_detail_screen.dart';
 import 'profile_screen.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 // Màu sắc chủ đạo lấy từ thiết kế của bạn
 const Color kPrimaryColor = Color(0xFF00C853); // Xanh lá
@@ -70,34 +72,63 @@ class _HomeScreenState extends State<HomeScreen> {
 // ====================
 // GIAO DIỆN TRANG CHỦ
 // ====================
-class HomeContent extends StatelessWidget {
+class HomeContent extends StatefulWidget {
   const HomeContent({super.key});
+
+  @override
+  State<HomeContent> createState() => _HomeContentState();
+}
+
+class _HomeContentState extends State<HomeContent> {
+  List<dynamic> _farms = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchFarms();
+  }
+
+  // Hàm gọi API lấy danh sách nông dân
+  Future<void> _fetchFarms() async {
+    try {
+      // Lưu ý: Đây là API công khai, không cần Token
+      final response = await http.get(
+        Uri.parse('http://10.0.2.2:5000/api/products/farmers'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          _farms = data['data']; // Gán dữ liệu vào list
+          _isLoading = false;
+        });
+      } else {
+        // Lỗi nhẹ thì cứ cho list rỗng, tắt loading
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      print("Lỗi kết nối: $e");
+      setState(() => _isLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kBackgroundColor,
-      // Header tùy chỉnh
       appBar: AppBar(
         backgroundColor: kPrimaryColor,
         elevation: 0,
         leading: const Padding(
           padding: EdgeInsets.all(10.0),
-          child: Icon(
-            Icons.looks_3, // Icon số 3 có sẵn
-            color: Colors.white,
-            size: 30,
-          ),
+          child: Icon(Icons.looks_3, color: Colors.white, size: 30),
         ),
         title: const Text(
           "3TML FARM",
           style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.card_giftcard, color: Colors.white),
-            onPressed: () {},
-          ),
-          // NÚT QUÉT QR Ở GÓC PHẢI
           IconButton(
             icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
             onPressed: () {
@@ -115,7 +146,7 @@ class HomeContent extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. Phần Banner cong cong màu xanh
+            // 1. BANNER (Giữ nguyên code cũ của ông cho đẹp)
             Stack(
               children: [
                 Container(
@@ -128,7 +159,6 @@ class HomeContent extends StatelessWidget {
                     ),
                   ),
                 ),
-                // Banner Quảng cáo
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 20,
@@ -138,13 +168,11 @@ class HomeContent extends StatelessWidget {
                     width: double.infinity,
                     height: 160,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFF3E0), // Màu cam nhạt
+                      color: const Color(0xFFFFF3E0),
                       borderRadius: BorderRadius.circular(20),
-                      image: DecorationImage(
-                        image: ResizeImage(
-                          AssetImage('assets/images/banner-2.jpg'),
-                          width: 800,
-                        ),
+                      image: const DecorationImage(
+                        // Dùng ảnh thật hoặc ảnh mạng nếu có
+                        image: AssetImage('assets/images/banner-2.jpg'),
                         fit: BoxFit.cover,
                         opacity: 0.8,
                       ),
@@ -156,7 +184,7 @@ class HomeContent extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            "Transparency\nfrom garden\nto table.",
+                            "Minh bạch\ntừ nông trại\nđến bàn ăn.",
                             style: TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
@@ -173,46 +201,55 @@ class HomeContent extends StatelessWidget {
 
             const SizedBox(height: 20),
 
-            // 2. Categories (Danh mục ngang)
-            _buildSectionTitle("Categories", () {}),
+            // 2. DANH MỤC (Giữ nguyên)
+            _buildSectionTitle("Danh mục", () {}),
             SizedBox(
               height: 60,
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 children: [
-                  _buildCategoryChip("Langsat", Icons.eco),
-                  _buildCategoryChip("Dracontomelon", Icons.circle),
-                  _buildCategoryChip("Carambola", Icons.star),
-                  _buildCategoryChip("Avocado", Icons.lens),
+                  _buildCategoryChip("Rau củ", Icons.eco),
+                  _buildCategoryChip("Trái cây", Icons.circle),
+                  _buildCategoryChip("Gạo", Icons.grass),
+                  _buildCategoryChip("Hạt", Icons.lens),
                 ],
               ),
             ),
 
             const SizedBox(height: 20),
 
-            // 3. Recommend Farm (Danh sách dọc)
-            _buildSectionTitle("Recommend farm", () {}),
+            // 3. NÔNG TRẠI NỔI BẬT (DATA THẬT)
+            _buildSectionTitle("Nông trại tiêu biểu", () {}),
 
-            // Danh sách các nông trại
-            ListView.builder(
-              shrinkWrap: true, // Quan trọng để nằm trong SingleChildScrollView
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: 3,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              itemBuilder: (context, index) {
-                return _buildFarmCard(context);
-              },
-            ),
+            // Hiển thị List thật
+            _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: kPrimaryColor),
+                  )
+                : _farms.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Text("Chưa có nông trại nào đăng ký."),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _farms.length,
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    itemBuilder: (context, index) {
+                      return _buildFarmCard(context, _farms[index]);
+                    },
+                  ),
 
-            const SizedBox(height: 80), // Khoảng trống dưới cùng
+            const SizedBox(height: 80),
           ],
         ),
       ),
     );
   }
 
-  // Widget tiêu đề section
+  // Widget Tiêu đề
   Widget _buildSectionTitle(String title, VoidCallback onPress) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -227,16 +264,13 @@ class HomeContent extends StatelessWidget {
               color: kPrimaryColor,
             ),
           ),
-          GestureDetector(
-            onTap: onPress,
-            child: const Text("View all", style: TextStyle(color: Colors.grey)),
-          ),
+          // GestureDetector(onTap: onPress, child: const Text("Xem tất cả", style: TextStyle(color: Colors.grey))),
         ],
       ),
     );
   }
 
-  // Widget Category Chip (Nút tròn tròn)
+  // Widget Chip Danh mục
   Widget _buildCategoryChip(String label, IconData icon) {
     return Container(
       margin: const EdgeInsets.only(right: 15),
@@ -256,11 +290,10 @@ class HomeContent extends StatelessWidget {
     );
   }
 
-  // Widget Farm Card (Thẻ Nông trại)
-  Widget _buildFarmCard(BuildContext context) {
+  // Widget Card Nông Trại (ĐÃ SỬA ĐỂ NHẬN DATA THẬT)
+  Widget _buildFarmCard(BuildContext context, dynamic farm) {
     return GestureDetector(
       onTap: () {
-        // Điều hướng sang màn hình chi tiết Nông trại
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => const FarmDetailScreen()),
@@ -283,17 +316,16 @@ class HomeContent extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Ảnh cover nông trại
+            // Ảnh cover (Vì User chưa có chức năng up ảnh bìa, ta dùng ảnh random hoặc mặc định)
             ClipRRect(
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(20),
               ),
               child: Image.asset(
-                'assets/images/farm_1.jpg',
+                'assets/images/farm_1.jpg', // Dùng ảnh mặc định cho đẹp
                 height: 150,
                 width: double.infinity,
                 fit: BoxFit.cover,
-                cacheWidth: 600,
               ),
             ),
             Padding(
@@ -304,40 +336,41 @@ class HomeContent extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        "3TML Farm Corp",
-                        style: TextStyle(
+                      // HIỂN THỊ TÊN THẬT CỦA FARMER
+                      Text(
+                        farm['fullName'] ?? "Nông trại ẩn danh",
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      Icon(Icons.favorite_border, color: Colors.grey),
+                      const Icon(
+                        Icons.verified,
+                        color: Colors.blue,
+                        size: 20,
+                      ), // Thêm cái tick xanh cho uy tín
                     ],
                   ),
                   const SizedBox(height: 5),
                   Row(
                     children: [
-                      Icon(Icons.star, color: Colors.amber, size: 18),
-                      Icon(Icons.star, color: Colors.amber, size: 18),
-                      Icon(Icons.star, color: Colors.amber, size: 18),
-                      Icon(Icons.star, color: Colors.amber, size: 18),
-                      Icon(Icons.star, color: Colors.amber, size: 18),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
                       Icon(
                         Icons.location_on_outlined,
                         size: 16,
-                        color: Colors.grey,
+                        color: Colors.grey[600],
                       ),
                       const SizedBox(width: 5),
+                      // HIỂN THỊ ĐỊA CHỈ THẬT
                       Text(
-                        "Ho Chi Minh city",
+                        farm['address'] ?? "Chưa cập nhật địa chỉ",
                         style: TextStyle(color: Colors.grey[600]),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    "SĐT: ${farm['phone']}",
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                 ],
               ),

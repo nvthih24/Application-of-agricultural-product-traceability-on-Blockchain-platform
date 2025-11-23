@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'login_screen.dart';
+import 'package:intl/intl.dart'; // flutter pub add intl
 import 'home_screen.dart';
 
-const Color kInspectorColor = Color(0xFF6A1B9A); // Tím đậm
-const Color kInspectorLight = Color(0xFF9C4DCC); // Tím nhạt
+const Color kInspectorColor = Color(0xFF6A1B9A);
+const Color kInspectorLight = Color(0xFF9C4DCC);
 
 class InspectorMainScreen extends StatefulWidget {
   const InspectorMainScreen({super.key});
@@ -16,46 +19,43 @@ class InspectorMainScreen extends StatefulWidget {
 class _InspectorMainScreenState extends State<InspectorMainScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  bool _isLoading = true;
 
-  // DỮ LIỆU GIẢ LẬP
-  List<Map<String, dynamic>> pendingPlanting = [
-    {
-      "id": "CAITHIA-NEW-001",
-      "name": "Cải thìa hữu cơ",
-      "farm": "3TML Farm",
-      "date": "23/11/2025",
-      "image": "assets/images/farm_1.jpg",
-      "type": "planting",
-    },
-    {
-      "id": "RAU-NEW-002",
-      "name": "Rau muống",
-      "farm": "Green Farm",
-      "date": "23/11/2025",
-      "image": "assets/images/farm_1.jpg",
-      "type": "planting",
-    },
-  ];
-
-  List<Map<String, dynamic>> pendingHarvest = [
-    {
-      "id": "DUAHAU-HARVEST-88",
-      "name": "Dưa hấu Long An",
-      "farm": "3TML Farm",
-      "date": "20/02/2026",
-      "quantity": "500 kg",
-      "image": "assets/images/fruit.png",
-      "type": "harvest",
-    },
-  ];
+  List<dynamic> pendingPlanting = [];
+  List<dynamic> pendingHarvest = [];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _fetchPendingRequests();
   }
 
-  // Hàm hiển thị hộp thoại xác nhận đăng xuất
+  // 1. GỌI API LẤY DANH SÁCH CHỜ
+  Future<void> _fetchPendingRequests() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    try {
+      final response = await http.get(
+        Uri.parse('http://10.0.2.2:5000/api/products/pending-requests'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body)['data'];
+        setState(() {
+          pendingPlanting = data['planting'];
+          pendingHarvest = data['harvest'];
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print("Lỗi lấy danh sách: $e");
+      setState(() => _isLoading = false);
+    }
+  }
+
   void _showLogoutDialog() {
     showDialog(
       context: context,
@@ -110,34 +110,77 @@ class _InspectorMainScreenState extends State<InspectorMainScreen>
     }
   }
 
-  void _processRequest(Map<String, dynamic> item, bool isApproved) {
-    setState(() {
-      if (item['type'] == 'planting') {
-        pendingPlanting.remove(item);
+  // 2. HÀM DUYỆT / TỪ CHỐI (GỌI TRANSACTION API)
+  Future<void> _processRequest(
+    Map<String, dynamic> item,
+    bool isApproved,
+  ) async {
+    setState(() => _isLoading = true);
+
+    String action = "";
+    if (item['type'] == 'planting') {
+      action = isApproved ? 'approvePlanting' : 'rejectPlanting';
+    } else {
+      action = isApproved ? 'approveHarvest' : 'rejectHarvest';
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    try {
+      final response = await http.post(
+        Uri.parse('http://10.0.2.2:5000/api/auth/transactions'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'action': action, 'productId': item['id']}),
+      );
+
+      if (response.statusCode == 200) {
+        // Xóa item khỏi list hiển thị
+        setState(() {
+          if (item['type'] == 'planting') {
+            pendingPlanting.remove(item);
+          } else {
+            pendingHarvest.remove(item);
+          }
+          _isLoading = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isApproved ? "Đã DUYỆT thành công!" : "Đã TỪ CHỐI!"),
+            backgroundColor: isApproved ? Colors.green : Colors.orange,
+          ),
+        );
       } else {
-        pendingHarvest.remove(item);
+        throw Exception(jsonDecode(response.body)['error']);
       }
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          isApproved ? "Đã DUYỆT thành công!" : "Đã TỪ CHỐI yêu cầu!",
-        ),
-        backgroundColor: isApproved ? Colors.green : Colors.red,
-      ),
-    );
+    } catch (e) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Lỗi: $e"), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  String _formatDate(int timestamp) {
+    if (timestamp == 0) return "N/A";
+    return DateFormat(
+      'dd/MM/yyyy',
+    ).format(DateTime.fromMillisecondsSinceEpoch(timestamp * 1000));
   }
 
   @override
   Widget build(BuildContext context) {
-    // Tính tổng việc cần làm
     int totalTasks = pendingPlanting.length + pendingHarvest.length;
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
       body: Column(
         children: [
-          // 1. CUSTOM HEADER (THAY CHO APPBAR CŨ)
+          // HEADER
           Container(
             padding: const EdgeInsets.only(
               top: 50,
@@ -148,25 +191,15 @@ class _InspectorMainScreenState extends State<InspectorMainScreen>
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [kInspectorColor, kInspectorLight],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.only(
                 bottomLeft: Radius.circular(30),
                 bottomRight: Radius.circular(30),
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 10,
-                  offset: Offset(0, 5),
-                ),
-              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Hàng trên cùng: Chào mừng & Logout
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -175,14 +208,14 @@ class _InspectorMainScreenState extends State<InspectorMainScreen>
                       children: [
                         const Text(
                           "Xin chào, Moderator",
-                          style: TextStyle(color: Colors.white70, fontSize: 14),
+                          style: TextStyle(color: Colors.white70),
                         ),
                         const SizedBox(height: 5),
                         Text(
                           "Cần xử lý: $totalTasks yêu cầu",
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 22,
+                            fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -190,24 +223,14 @@ class _InspectorMainScreenState extends State<InspectorMainScreen>
                     ),
                     IconButton(
                       onPressed: _showLogoutDialog,
-                      icon: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white24,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.logout, color: Colors.white),
-                      ),
+                      icon: const Icon(Icons.logout, color: Colors.white),
                     ),
                   ],
                 ),
-
-                const SizedBox(height: 25),
-
-                // 2. CUSTOM TAB BAR (NẰM TRONG HEADER)
+                const SizedBox(height: 20),
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black26,
                     borderRadius: BorderRadius.circular(15),
                   ),
                   child: TabBar(
@@ -218,7 +241,6 @@ class _InspectorMainScreenState extends State<InspectorMainScreen>
                     ),
                     labelColor: kInspectorColor,
                     unselectedLabelColor: Colors.white,
-                    labelStyle: const TextStyle(fontWeight: FontWeight.bold),
                     tabs: [
                       _buildTabWithBadge("Gieo Trồng", pendingPlanting.length),
                       _buildTabWithBadge("Thu Hoạch", pendingHarvest.length),
@@ -229,28 +251,29 @@ class _InspectorMainScreenState extends State<InspectorMainScreen>
             ),
           ),
 
-          // 3. NỘI DUNG DANH SÁCH
+          // LIST VIEW
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildList(
-                  pendingPlanting,
-                  "Sạch sẽ! Không có yêu cầu gieo trồng mới.",
-                ),
-                _buildList(
-                  pendingHarvest,
-                  "Tuyệt vời! Đã duyệt hết yêu cầu thu hoạch.",
-                ),
-              ],
-            ),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildList(
+                        pendingPlanting,
+                        "Không có yêu cầu gieo trồng mới.",
+                      ),
+                      _buildList(
+                        pendingHarvest,
+                        "Không có yêu cầu thu hoạch mới.",
+                      ),
+                    ],
+                  ),
           ),
         ],
       ),
     );
   }
 
-  // Widget Tab có số lượng (Badge)
   Widget _buildTabWithBadge(String title, int count) {
     return Tab(
       child: Row(
@@ -262,16 +285,12 @@ class _InspectorMainScreenState extends State<InspectorMainScreen>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: Colors.redAccent,
+                color: Colors.red,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
                 "$count",
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: const TextStyle(color: Colors.white, fontSize: 10),
               ),
             ),
           ],
@@ -280,47 +299,37 @@ class _InspectorMainScreenState extends State<InspectorMainScreen>
     );
   }
 
-  Widget _buildList(List<Map<String, dynamic>> items, String emptyMsg) {
-    if (items.isEmpty) {
+  Widget _buildList(List<dynamic> items, String emptyMsg) {
+    if (items.isEmpty)
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.check_circle_outline, size: 80, color: Colors.grey[300]),
-            const SizedBox(height: 15),
-            Text(emptyMsg, style: const TextStyle(color: Colors.grey)),
-          ],
-        ),
+        child: Text(emptyMsg, style: const TextStyle(color: Colors.grey)),
       );
-    }
-    return ListView.builder(
-      padding: const EdgeInsets.all(15),
-      itemCount: items.length,
-      itemBuilder: (context, index) {
-        return _buildRequestCard(items[index]);
-      },
+
+    return RefreshIndicator(
+      onRefresh: _fetchPendingRequests,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(15),
+        itemCount: items.length,
+        itemBuilder: (ctx, i) => _buildRequestCard(items[i]),
+      ),
     );
   }
 
-  // ... (Hàm _buildRequestCard giữ nguyên như cũ của ông, chỉ đổi style nút cho đẹp tí nếu muốn)
   Widget _buildRequestCard(Map<String, dynamic> item) {
     bool isHarvest = item['type'] == 'harvest';
-
     return Card(
       margin: const EdgeInsets.only(bottom: 15),
-      elevation: 3, // Tăng độ nổi
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       child: Padding(
-        padding: const EdgeInsets.all(15.0), // Tăng padding
+        padding: const EdgeInsets.all(15.0),
         child: Column(
           children: [
-            // Phần thông tin (Giữ nguyên logic cũ)
             Row(
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(10),
-                  child: Image.asset(
-                    item['image'],
+                  child: Image.network(
+                    item['image'] ?? '',
                     width: 90,
                     height: 90,
                     fit: BoxFit.cover,
@@ -328,7 +337,7 @@ class _InspectorMainScreenState extends State<InspectorMainScreen>
                       width: 90,
                       height: 90,
                       color: Colors.grey[300],
-                      child: Icon(Icons.broken_image, color: Colors.grey),
+                      child: const Icon(Icons.image),
                     ),
                   ),
                 ),
@@ -337,9 +346,8 @@ class _InspectorMainScreenState extends State<InspectorMainScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Badge loại yêu cầu
                       Container(
-                        padding: EdgeInsets.symmetric(
+                        padding: const EdgeInsets.symmetric(
                           horizontal: 8,
                           vertical: 4,
                         ),
@@ -366,26 +374,20 @@ class _InspectorMainScreenState extends State<InspectorMainScreen>
                       Text(
                         item['name'],
                         style: const TextStyle(
-                          fontSize: 18,
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
                         "Farm: ${item['farm']}",
                         style: const TextStyle(
-                          fontSize: 14,
+                          fontSize: 13,
                           color: Colors.grey,
                         ),
                       ),
-                      const SizedBox(height: 5),
                       Text(
-                        isHarvest
-                            ? "Sản lượng: ${item['quantity']}"
-                            : "Ngày gửi: ${item['date']}",
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
+                        "Ngày: ${_formatDate(item['date'])}",
+                        style: const TextStyle(fontSize: 13),
                       ),
                     ],
                   ),
@@ -393,8 +395,6 @@ class _InspectorMainScreenState extends State<InspectorMainScreen>
               ],
             ),
             const SizedBox(height: 15),
-
-            // Phần Nút Bấm (Làm to rõ hơn)
             Row(
               children: [
                 Expanded(
@@ -403,10 +403,6 @@ class _InspectorMainScreenState extends State<InspectorMainScreen>
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.red,
                       side: const BorderSide(color: Colors.red),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
                     ),
                     child: const Text("Từ chối"),
                   ),
@@ -418,10 +414,6 @@ class _InspectorMainScreenState extends State<InspectorMainScreen>
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
                     ),
                     child: const Text("Chấp thuận"),
                   ),

@@ -1,6 +1,3 @@
-// lib/farmer_main_screen.dart
-// DÁN ĐÈ TOÀN BỘ FILE NÀY – ĐÃ TEST 100% CHẠY NGON!
-
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -9,6 +6,7 @@ import 'add_crop_screen.dart';
 import 'profile_screen.dart';
 import 'harvest_product_screen.dart';
 import 'care_diary_screen.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 const Color kFarmerPrimaryColor = Color(0xFF2E7D32);
 
@@ -206,6 +204,8 @@ class _FarmerDashboardTabState extends State<FarmerDashboardTab> {
         ? Colors.orange
         : (statusCode == 1 ? Colors.blue : Colors.green);
 
+    int plantingStatus = crop['plantingStatus'] ?? 0;
+    bool isApproved = (plantingStatus == 1);
     return Card(
       margin: const EdgeInsets.only(bottom: 15),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -242,12 +242,40 @@ class _FarmerDashboardTabState extends State<FarmerDashboardTab> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        name,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              name,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+
+                          // --- LOGIC NÚT QR MỚI ---
+                          if (isApproved)
+                            IconButton(
+                              icon: const Icon(
+                                Icons.qr_code_2,
+                                color: Colors.black87,
+                              ),
+                              tooltip: "Lấy mã QR",
+                              onPressed: () => _showQrDialog(context, id, name),
+                            )
+                          else
+                            // Nếu chưa duyệt -> Hiện icon chờ hoặc ẩn luôn
+                            Tooltip(
+                              message: "Chờ kiểm duyệt phê chuẩn mới có mã",
+                              child: Icon(
+                                Icons.hourglass_empty,
+                                size: 20,
+                                color: Colors.orange[300],
+                              ),
+                            ),
+                        ],
                       ),
                       Text(
                         "ID: $id",
@@ -550,6 +578,49 @@ class _FarmerDashboardTabState extends State<FarmerDashboardTab> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // Hàm hiển thị Mã QR phóng to để in hoặc quét
+  void _showQrDialog(BuildContext context, String data, String name) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("Mã QR: $name", style: const TextStyle(fontSize: 16)),
+        content: SizedBox(
+          width: 250,
+          height: 250,
+          child: Center(
+            child: QrImageView(
+              data: data, // Dữ liệu chính là ID lô hàng (VD: BATCH-1732...)
+              version: QrVersions.auto,
+              size: 200.0,
+              backgroundColor: Colors.white,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Đóng"),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              // Tính năng nâng cao: Kết nối máy in hoặc Lưu ảnh
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("Đã gửi lệnh đến máy in! (Giả lập)"),
+                ),
+              );
+            },
+            icon: const Icon(Icons.print, color: Colors.white),
+            label: const Text("In Tem", style: TextStyle(color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kFarmerPrimaryColor,
+            ),
+          ),
+        ],
       ),
     );
   }

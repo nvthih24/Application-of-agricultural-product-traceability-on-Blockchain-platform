@@ -9,35 +9,53 @@ const router = express.Router();
 
 // REGISTER (app Flutter sẽ gửi thêm walletAddress nếu có)
 router.post("/register", async (req, res) => {
-  const { fullName, phone, email, address, password, confirmPassword, role, walletAddress } = req.body;
+  const {
+    fullName,
+    phone,
+    email,
+    address,
+    password,
+    confirmPassword,
+    role,
+    walletAddress,
+  } = req.body;
 
-  if (password !== confirmPassword) return res.status(400).json({ msg: "Passwords do not match" });
-  if (role === "admin") return res.status(403).json({ msg: "Cannot register as admin" });
+  if (password !== confirmPassword)
+    return res.status(400).json({ msg: "Passwords do not match" });
+  if (role === "admin")
+    return res.status(403).json({ msg: "Cannot register as admin" });
 
   try {
     let user = await User.findOne({ email });
     if (user) return res.status(400).json({ msg: "User already exists" });
 
-    user = new User({ 
-      fullName, phone, email, address, password, role, 
-      walletAddress: walletAddress || null 
+    user = new User({
+      fullName,
+      phone,
+      email,
+      address,
+      password,
+      role,
+      walletAddress: walletAddress || null,
     });
     await user.save();
 
-    const payload = { 
-      userId: user._id, 
-      role: user.role, 
-      walletAddress: user.walletAddress 
+    const payload = {
+      userId: user._id,
+      role: user.role,
+      walletAddress: user.walletAddress,
     };
-    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "7d" });
+    const token = jwt.sign(payload, process.env.JWT_SECRET, {
+      expiresIn: "7d",
+    });
 
     res.json({
       token,
-      user: { 
-        id: user._id, 
-        email: user.email, 
+      user: {
+        id: user._id,
+        email: user.email,
         role: user.role,
-        walletAddress: user.walletAddress 
+        walletAddress: user.walletAddress,
       },
     });
   } catch (err) {
@@ -57,20 +75,22 @@ router.post("/login", async (req, res) => {
     const isMatch = await user.comparePassword(password);
     if (!isMatch) return res.status(400).json({ msg: "Invalid credentials" });
 
-    const payload = { 
-      userId: user._id, 
-      role: user.role, 
-      walletAddress: user.walletAddress || null   // có thể null
+    const payload = {
+      userId: user._id,
+      role: user.role,
+      walletAddress: user.walletAddress || null, // có thể null
     };
-    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "7d" });
+    const token = jwt.sign(payload, process.env.JWT_SECRET, {
+      expiresIn: "7d",
+    });
 
     res.json({
       token,
-      user: { 
-        id: user._id, 
-        email: user.email, 
+      user: {
+        id: user._id,
+        email: user.email,
         role: user.role,
-        walletAddress: user.walletAddress 
+        walletAddress: user.walletAddress,
       },
     });
   } catch (err) {
@@ -92,7 +112,8 @@ router.get("/me", auth, async (req, res) => {
 // Bind ví (dùng khi user lần đầu connect ví trên app)
 router.post("/bind-wallet", auth, async (req, res) => {
   const { walletAddress } = req.body;
-  if (!walletAddress) return res.status(400).json({ msg: "walletAddress required" });
+  if (!walletAddress)
+    return res.status(400).json({ msg: "walletAddress required" });
 
   try {
     const user = await User.findById(req.user.userId);
@@ -104,13 +125,19 @@ router.post("/bind-wallet", auth, async (req, res) => {
     await user.save();
 
     // Tạo token mới có wallet
-    const payload = { userId: user._id, role: user.role, walletAddress: user.walletAddress };
-    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "7d" });
+    const payload = {
+      userId: user._id,
+      role: user.role,
+      walletAddress: user.walletAddress,
+    };
+    const token = jwt.sign(payload, process.env.JWT_SECRET, {
+      expiresIn: "7d",
+    });
 
-    res.json({ 
-      msg: "Wallet bound successfully", 
+    res.json({
+      msg: "Wallet bound successfully",
       token,
-      walletAddress: user.walletAddress 
+      walletAddress: user.walletAddress,
     });
   } catch (err) {
     console.error(err);
@@ -118,8 +145,6 @@ router.post("/bind-wallet", auth, async (req, res) => {
   }
 });
 
-
 // Các route còn lại (get users, get transactions…) giữ nguyên
 // ...
-
 module.exports = router;
