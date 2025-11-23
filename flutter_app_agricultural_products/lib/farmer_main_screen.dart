@@ -363,6 +363,10 @@ class _FarmerDashboardTabState extends State<FarmerDashboardTab> {
 
   @override
   Widget build(BuildContext context) {
+    // TÍNH TOÁN SỐ LIỆU THỐNG KÊ TỪ DỮ LIỆU THẬT
+    int total = myCrops.length;
+    int planting = myCrops.where((c) => c['statusCode'] == 1).length;
+    int harvested = myCrops.where((c) => c['statusCode'] == 2).length;
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
@@ -407,10 +411,15 @@ class _FarmerDashboardTabState extends State<FarmerDashboardTab> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const AddCropScreen()),
-        ),
+        onPressed: () async {
+          // Dùng await để chờ màn hình thêm mới đóng lại
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AddCropScreen()),
+          );
+          // Sau khi quay về thì tải lại danh sách ngay
+          _loadMyProducts();
+        },
         backgroundColor: kFarmerPrimaryColor,
         icon: const Icon(Icons.add, color: Colors.white),
         label: const Text("Thêm Mùa Vụ", style: TextStyle(color: Colors.white)),
@@ -426,18 +435,122 @@ class _FarmerDashboardTabState extends State<FarmerDashboardTab> {
                 style: const TextStyle(color: Colors.red),
               ),
             )
-          : _foundProducts.isEmpty
-          ? const Center(
-              child: Text(
-                "Chưa có lô hàng nào\nNhấn + để thêm mùa vụ mới",
-                textAlign: TextAlign.center,
+          : RefreshIndicator(
+              onRefresh: _loadMyProducts,
+              color: kFarmerPrimaryColor,
+              child: SingleChildScrollView(
+                // Phải bọc trong SingleChildScrollView
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 1. PHẦN THỐNG KÊ (ĐÃ KHÔI PHỤC)
+                    Padding(
+                      padding: const EdgeInsets.all(15.0),
+                      child: Row(
+                        children: [
+                          _buildStatCard("Tổng SP", "$total", Colors.blue),
+                          const SizedBox(width: 10),
+                          _buildStatCard(
+                            "Đang trồng",
+                            "$planting",
+                            Colors.orange,
+                          ),
+                          const SizedBox(width: 10),
+                          _buildStatCard("Đã xong", "$harvested", Colors.green),
+                        ],
+                      ),
+                    ),
+
+                    // 2. TIÊU ĐỀ DANH SÁCH
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 15,
+                        vertical: 5,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            "Danh sách sản phẩm",
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          if (_selectedStatus != "Tất cả")
+                            Text(
+                              "Lọc: $_selectedStatus",
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.red,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+
+                    // 3. DANH SÁCH SẢN PHẨM
+                    _foundProducts.isEmpty
+                        ? const SizedBox(
+                            height: 300,
+                            child: Center(
+                              child: Text(
+                                "Chưa có lô hàng nào\nNhấn + để thêm",
+                              ),
+                            ),
+                          )
+                        : ListView.builder(
+                            shrinkWrap: true, // Để nằm trong Column
+                            physics:
+                                const NeverScrollableScrollPhysics(), // Tắt cuộn riêng lẻ
+                            padding: const EdgeInsets.all(15),
+                            itemCount: _foundProducts.length,
+                            itemBuilder: (_, i) =>
+                                _buildCropCard(_foundProducts[i]),
+                          ),
+
+                    const SizedBox(
+                      height: 80,
+                    ), // Khoảng trống dưới cùng để không bị FAB che
+                  ],
+                ),
               ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(15),
-              itemCount: _foundProducts.length,
-              itemBuilder: (_, i) => _buildCropCard(_foundProducts[i]),
             ),
+    );
+  }
+
+  Widget _buildStatCard(String title, String count, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 15),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border(left: BorderSide(color: color, width: 4)),
+          boxShadow: [
+            BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 5),
+          ],
+        ),
+        child: Column(
+          children: [
+            Text(
+              count,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              title,
+              style: const TextStyle(fontSize: 11, color: Colors.grey),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

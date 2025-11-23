@@ -6,7 +6,8 @@ import 'signup_screen.dart'; // Import màn hình đăng ký
 import 'home_screen.dart';
 import 'farmer_main_screen.dart';
 import 'transporter_main_screen.dart';
-// import 'transporter_main_screen.dart'; // Nếu bạn đã tạo file này
+import 'inspector_main_screen.dart';
+import 'retailer_main_screen.dart';
 
 const Color kPrimaryColor = Color(0xFF00C853); // Màu xanh chủ đạo
 
@@ -67,6 +68,12 @@ class _LoginScreenState extends State<LoginScreen> {
               break;
             case 'transporter':
               nextScreen = const TransporterMainScreen();
+              break;
+            case 'moderator':
+              nextScreen = const InspectorMainScreen();
+              break;
+            case 'manager':
+              nextScreen = const RetailerMainScreen();
               break;
             default:
               nextScreen = const HomeScreen();

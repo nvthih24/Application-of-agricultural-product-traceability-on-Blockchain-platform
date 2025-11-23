@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart'; // Nhớ import file vừa tạo
+import 'inspector_main_screen.dart';
 
 void main() {
   runApp(const MyApp());

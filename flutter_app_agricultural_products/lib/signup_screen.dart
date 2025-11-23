@@ -152,6 +152,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   value: 'transporter',
                   child: Text("Nhà Vận Chuyển (Transporter)"),
                 ),
+                DropdownMenuItem(
+                  value: 'moderator',
+                  child: Text("Kiểm Duyệt Viên (Moderator)"),
+                ),
+                DropdownMenuItem(
+                  value: 'manager',
+                  child: Text("Nhà Bán Lẻ (Manager)"),
+                ),
                 // Bạn có thể thêm 'consumer' nếu backend hỗ trợ, nhưng hiện tại tập trung 2 vai trò này
               ],
               onChanged: (value) {

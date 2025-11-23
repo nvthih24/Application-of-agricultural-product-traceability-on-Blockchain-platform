@@ -93,6 +93,75 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  // Hàm hiển thị Dialog nhập ví
+  void _showWalletDialog() {
+    final TextEditingController walletController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Liên kết Ví Blockchain"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              "Nhập địa chỉ ví của bạn (Metamask/TrustWallet) để nhận thanh toán sau này.",
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: walletController,
+              decoration: const InputDecoration(
+                labelText: "Địa chỉ ví (0x...)",
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.account_balance_wallet),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Hủy"),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              // GỌI API LƯU VÍ
+              await _updateWallet(walletController.text.trim());
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            child: const Text(
+              "Liên kết",
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Hàm gọi API update ví
+  Future<void> _updateWallet(String address) async {
+    if (address.isEmpty || !address.startsWith("0x") || address.length != 42) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Địa chỉ ví không hợp lệ!"),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // ... Gọi API http.post('/api/auth/update-wallet') ...
+    // Nếu thành công thì setState lại biến _userWalletAddress
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Liên kết ví thành công!"),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Nếu chưa đăng nhập -> Hiện giao diện Khách
@@ -175,7 +244,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _buildProfileOption(
               Icons.account_balance_wallet_outlined,
               "Ví Blockchain",
-              () {},
+              () {
+                _showWalletDialog();
+              },
             ), // Mục quan trọng
 
             const SizedBox(height: 20),
