@@ -1,4 +1,4 @@
-// backend/routes/product.routes.js – BẢN CUỐI CÙNG, ĐÃ FIX TOÀN BỘ LỖI!
+// backend/routes/product.routes.js
 const express = require("express");
 const router = express.Router();
 const { readContract } = require("../blockchain/utils/signer");

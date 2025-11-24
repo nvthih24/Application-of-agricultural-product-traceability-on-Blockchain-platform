@@ -9,7 +9,7 @@ router.post("/", jwtAuth, async (req, res) => {
   try {
     const { action, ...data } = req.body;
 
-    // LẤY THÔNG TIN USER TỪ MONGODB (KHÔNG DÙNG VÍ NỮA)
+    // LẤY THÔNG TIN USER TỪ MONGODB 
     const currentUser = await User.findById(req.user.userId);
     if (!currentUser) {
       return res.status(404).json({ error: "Không tìm thấy người dùng" });
@@ -34,7 +34,7 @@ router.post("/", jwtAuth, async (req, res) => {
         break;
 
       case "logCare":
-        // KIỂM TRA CHỦ SỞ HỮU BẰNG PHONE THAY VÌ VÍ
+        // KIỂM TRA CHỦ SỞ HỮU BẰNG PHONE 
         const trace = await contract.getTrace(data.productId);
         if (trace.creatorPhone !== currentUser.phone) {
           return res.status(403).json({ error: "Bạn không phải chủ lô hàng!" });
@@ -55,7 +55,6 @@ router.post("/", jwtAuth, async (req, res) => {
       case "approvePlanting":
         // Kiểm tra xem user đang đăng nhập có phải là Moderator không
         // (Lưu ý: req.user lấy từ jwtAuth middleware)
-        // Nếu trong token chưa có role thì phải query db, nhưng tạm thời bỏ qua check role nếu muốn test nhanh
         tx = await contract.approvePlanting(data.productId);
         break;
 

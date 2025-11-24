@@ -3,7 +3,7 @@ const router = express.Router();
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
-require('dotenv').config(); // ✅ đảm bảo .env load
+require('dotenv').config(); 
 
 // Cấu hình Cloudinary
 cloudinary.config({
@@ -17,7 +17,7 @@ const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: 'nong-san-truy-xuat',
-    allowedFormats: ['jpg', 'png', 'jpeg'], // ✅ đúng key
+    allowedFormats: ['jpg', 'png', 'jpeg'], 
     transformation: [{ width: 800, height: 800, crop: 'limit' }],
   },
 });
