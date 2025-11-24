@@ -5,8 +5,8 @@ const cors = require('cors');
 const authRoutes = require('./routes/auth');
 const uploadRoutes = require('./routes/upload');
 const qrCodeRoutes = require('./routes/qrcodes');
-const transactionRoutes = require('./routes/transaction.routes');
-const productRoutes = require('./routes/product.routes');
+const transactionRoutes = require('./routes/transaction');
+const productRoutes = require('./routes/product');
 
 
 dotenv.config();

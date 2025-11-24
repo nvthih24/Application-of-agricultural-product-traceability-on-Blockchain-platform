@@ -13,13 +13,7 @@ const userSchema = new mongoose.Schema({
     enum: ['farmer', 'transporter', 'manager', 'moderator', 'admin'], 
     default: 'farmer' 
   },
-  // THÊM DÒNG NÀY
-  walletAddress: { 
-    type: String, 
-    unique: true, 
-    sparse: true,   // cho phép null (user web cũ không có ví vẫn sống)
-    lowercase: true 
-  },
+
 });
 
 userSchema.pre('save', async function () {
