@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart'; // Nhớ import file vừa tạo
-import 'inspector_main_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -15,7 +14,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false, // Tắt chữ Debug đỏ đỏ
       theme: ThemeData(
         // Thiết lập font chữ và màu sắc
-        fontFamily: 'Roboto', // Hoặc font nào bạn thích
+        fontFamily: 'Roboto',
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF00C853)),
         useMaterial3: true,
       ),

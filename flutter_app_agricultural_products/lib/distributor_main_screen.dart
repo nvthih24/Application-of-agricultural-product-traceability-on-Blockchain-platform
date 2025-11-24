@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'login_screen.dart';
-import 'qr_scanner_screen.dart';
 
 const Color kDistributorColor = Color(0xFF673AB7); // Màu Tím (Thương mại)
 

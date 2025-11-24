@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:intl/intl.dart'; // Nhớ chạy: flutter pub add intl
+import 'dart:async';
 
 class ProductTraceScreen extends StatefulWidget {
   final String productId; // Nhận ID từ màn hình quét QR
@@ -236,15 +237,22 @@ class _ProductTraceScreenState extends State<ProductTraceScreen> {
             ),
 
           // BƯỚC 5: LÊN KỆ (Nếu có)
-          if (dates['delivery'] > 0)
+          if (_data!['retailer']['price'] > 0 ||
+              _data!['dates']['delivery'] > 0)
             _buildTimelineItem(
-              title: "Đã có mặt tại Siêu thị",
-              time: _formatDate(dates['delivery']),
+              title: "Đã Giao Hàng / Lên Kệ",
+              // Nếu chưa có ngày delivery thì lấy ngày hiện tại hoặc để trống
+              time: _formatDate(
+                _data!['dates']['delivery'] > 0
+                    ? _data!['dates']['delivery']
+                    : 0,
+              ),
               description:
-                  "Sản phẩm đã lên kệ và sẵn sàng đến tay người tiêu dùng.\nGiá bán tham khảo: ${_data!['retailer']['price'] ?? '...'} đ",
+                  "Sản phẩm đã có mặt tại điểm bán.\nGiá niêm yết: ${_data!['retailer']['price'] ?? '...'} đ",
               icon: Icons.storefront,
               color: Colors.purple,
               isLast: true,
+              isActive: true, // Luôn sáng
             ),
         ],
       ),
@@ -261,6 +269,7 @@ class _ProductTraceScreenState extends State<ProductTraceScreen> {
     String? imageUrl,
     bool isFirst = false,
     bool isLast = false,
+    bool isActive = true,
   }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,

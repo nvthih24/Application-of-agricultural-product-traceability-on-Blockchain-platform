@@ -3,108 +3,138 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'product_trace_screen.dart';
 
 class QrScannerScreen extends StatefulWidget {
-  const QrScannerScreen({super.key});
+  final bool isReturnData;
+  const QrScannerScreen({super.key, this.isReturnData = false});
 
   @override
   State<QrScannerScreen> createState() => _QrScannerScreenState();
 }
 
 class _QrScannerScreenState extends State<QrScannerScreen> {
-  // Biến kiểm soát xem đã phát hiện mã hay chưa (để tránh quét liên tục)
+  // Controller điều khiển camera
+  final MobileScannerController controller = MobileScannerController();
+
   bool _isScanCompleted = false;
 
+  // Hàm xử lý khi quét được mã
   void _onDetect(BarcodeCapture capture) async {
-    // Thêm async
     if (_isScanCompleted) return;
 
-    final String code = capture.barcodes.first.rawValue ?? "";
+    final List<Barcode> barcodes = capture.barcodes;
+    if (barcodes.isEmpty) return;
+
+    final String code = barcodes.first.rawValue ?? "";
 
     if (code.isNotEmpty) {
       setState(() {
-        _isScanCompleted = true; // Khóa lại ngay lập tức
+        _isScanCompleted = true; // Khóa lại để không quét liên tục
       });
 
       print("Đã quét mã: $code");
 
-      // Chuyển trang và CHỜ cho đến khi người dùng quay lại
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ProductTraceScreen(productId: code),
-        ),
-      );
+      if (widget.isReturnData) {
+        // 1. Trả dữ liệu về (cho Nhập kho)
+        Navigator.pop(context, code);
+      } else {
+        // 2. Chuyển trang Trace (cho Người mua)
+        // Tắt camera tạm thời
+        await controller.stop();
 
-      // Khi dòng này chạy, nghĩa là người dùng đã bấm Back quay lại đây
-      // Lúc này mới mở khóa để quét tiếp
-      if (mounted) {
-        // Kiểm tra xem màn hình còn tồn tại không
-        setState(() {
-          _isScanCompleted = false;
-        });
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProductTraceScreen(productId: code),
+          ),
+        );
+
+        // Khi quay lại thì bật lại camera
+        if (mounted) {
+          await controller.start();
+          setState(() {
+            _isScanCompleted = false;
+          });
+        }
       }
     }
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Quét Mã QR Sản Phẩm'),
-        // Thêm nút bật/tắt đèn flash
+        title: const Text('Quét Mã QR'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        foregroundColor: Colors.white,
         actions: [
-          IconButton(
-            onPressed: () {
-              // Lấy controller của MobileScanner và gọi toggleTorch()
-              // Cần 1 cách quản lý state phức tạp hơn (sẽ làm sau)
+          // NÚT BẬT ĐÈN FLASH (SỬA LẠI CHO HỢP BẢN MỚI)
+          ValueListenableBuilder(
+            valueListenable: controller,
+            builder: (context, state, child) {
+              // Logic mới: Kiểm tra state.torchState
+              final isFlashOn = state.torchState == TorchState.on;
+              return IconButton(
+                icon: Icon(
+                  isFlashOn ? Icons.flash_on : Icons.flash_off,
+                  color: isFlashOn ? Colors.yellow : Colors.grey,
+                ),
+                onPressed: () => controller.toggleTorch(),
+              );
             },
-            icon: const Icon(Icons.flash_on),
+          ),
+          // NÚT ĐỔI CAMERA (SỬA LẠI CHO HỢP BẢN MỚI)
+          ValueListenableBuilder(
+            valueListenable: controller,
+            builder: (context, state, child) {
+              // Logic mới: Kiểm tra state.cameraDirection
+              final isFront = state.cameraDirection == CameraFacing.front;
+              return IconButton(
+                icon: Icon(isFront ? Icons.camera_front : Icons.camera_rear),
+                onPressed: () => controller.switchCamera(),
+              );
+            },
           ),
         ],
       ),
+      extendBodyBehindAppBar: true,
       body: Stack(
         alignment: Alignment.center,
         children: [
-          // Lớp Camera
-          MobileScanner(
-            onDetect: _onDetect, // Hàm callback khi phát hiện mã
-          ),
-
-          // Lớp Phủ (Overlay)
+          MobileScanner(controller: controller, onDetect: _onDetect),
           _buildScannerOverlay(),
         ],
       ),
     );
   }
 
-  // Widget để vẽ lớp phủ (khung quét)
   Widget _buildScannerOverlay() {
-    double scanBoxSize =
-        MediaQuery.of(context).size.width * 0.7; // 70% chiều rộng
-
+    double scanBoxSize = MediaQuery.of(context).size.width * 0.7;
     return Container(
       child: Stack(
         children: [
-          // Lớp mờ xung quanh
           ColorFiltered(
             colorFilter: ColorFilter.mode(
-              Colors.black.withOpacity(0.5), // Lớp mờ 50%
+              Colors.black.withOpacity(0.5),
               BlendMode.srcOut,
             ),
             child: Stack(
               children: [
                 Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.transparent, // Nền trong suốt
-                  ),
+                  decoration: const BoxDecoration(color: Colors.transparent),
                 ),
-                // Vùng "cắt" ở giữa (khung quét)
                 Align(
                   alignment: Alignment.center,
                   child: Container(
                     width: scanBoxSize,
                     height: scanBoxSize,
                     decoration: BoxDecoration(
-                      color: Colors.black, // Màu này không quan trọng
+                      color: Colors.black,
                       borderRadius: BorderRadius.circular(20),
                     ),
                   ),
@@ -112,25 +142,21 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
               ],
             ),
           ),
-
-          // Viền của khung quét
           Align(
             alignment: Alignment.center,
             child: Container(
               width: scanBoxSize,
               height: scanBoxSize,
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.green, width: 3), // Viền xanh
+                border: Border.all(color: Colors.green, width: 3),
                 borderRadius: BorderRadius.circular(20),
               ),
             ),
           ),
-
-          // Văn bản hướng dẫn
           const Align(
             alignment: Alignment.topCenter,
             child: Padding(
-              padding: EdgeInsets.only(top: 80), // Cách top 80px
+              padding: EdgeInsets.only(top: 100),
               child: Text(
                 'Đặt mã QR vào trong khung',
                 style: TextStyle(

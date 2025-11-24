@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'login_screen.dart';
 import 'package:intl/intl.dart'; // flutter pub add intl
 import 'home_screen.dart';
 

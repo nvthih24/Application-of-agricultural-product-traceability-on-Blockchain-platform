@@ -9,7 +9,7 @@ router.post("/", jwtAuth, async (req, res) => {
   try {
     const { action, ...data } = req.body;
 
-    // LẤY THÔNG TIN USER TỪ MONGODB 
+    // LẤY THÔNG TIN USER TỪ MONGODB
     const currentUser = await User.findById(req.user.userId);
     if (!currentUser) {
       return res.status(404).json({ error: "Không tìm thấy người dùng" });
@@ -29,12 +29,14 @@ router.post("/", jwtAuth, async (req, res) => {
           data.seedOrigin || data.seedSource || "",
           "",
           currentUser.phone || "0900000000", // SĐT thật
-          currentUser.fullName || "Nông dân" // Tên thật
+          currentUser.fullName || "Nông dân", // Tên thật
+          0,
+          "",
         );
         break;
 
       case "logCare":
-        // KIỂM TRA CHỦ SỞ HỮU BẰNG PHONE 
+        // KIỂM TRA CHỦ SỞ HỮU BẰNG PHONE
         const trace = await contract.getTrace(data.productId);
         if (trace.creatorPhone !== currentUser.phone) {
           return res.status(403).json({ error: "Bạn không phải chủ lô hàng!" });
@@ -48,6 +50,45 @@ router.post("/", jwtAuth, async (req, res) => {
           data.careImageUrl || "",
           currentUser.phone || "0900000000",
           currentUser.fullName || "Nông dân"
+        );
+        break;
+case "harvestProduct":
+        // Kiểm tra quyền sở hữu (Optional)
+        // const trace = await contract.getTrace(data.productId);
+        // if (trace.creatorPhone !== currentUser.phone) return res.status(403)...
+
+        tx = await contract.updateProduct( // Contract tên là updateProduct
+          data.productId,
+          data.productName || "Sản phẩm", // Tên SP
+          data.farmName || currentUser.fullName + "'s Farm", // Tên Farm
+          data.harvestDate, // Ngày thu hoạch
+          data.harvestImageUrl || "", // Ảnh thu hoạch
+          data.quantity || 0, // Sản lượng (Số lượng)
+          data.quality || "Loại 1" // Chất lượng
+        );
+        break;
+// 4. TRANSPORTER: Nhận hàng (Pickup)
+      case "updateReceive":
+        // Kiểm tra quyền (Nếu cần)
+        // if (req.user.role !== 'transporter') return res.status(403)...
+        
+        tx = await contract.updateReceive(
+          data.productId,
+          data.transporterName || currentUser.fullName, // Tên tài xế
+          data.receiveDate, // Thời gian nhận
+          data.receiveImageUrl || "", // Ảnh nhận hàng (nếu có)
+          data.transportInfo || "Xe vận chuyển" // Biển số xe / Ghi chú
+        );
+        break;
+
+      // 5. TRANSPORTER: Giao hàng (Delivery)
+      case "updateDelivery":
+        tx = await contract.updateDelivery(
+          data.productId,
+          data.transporterName || currentUser.fullName,
+          data.deliveryDate,
+          data.deliveryImageUrl || "",
+          data.transportInfo || "Giao thành công"
         );
         break;
 
@@ -73,7 +114,25 @@ router.post("/", jwtAuth, async (req, res) => {
         tx = await contract.rejectHarvest(data.productId);
         break;
 
-      // Các case khác (updateProduct, harvest, transport...) thêm sau
+      // 5. RETAILER: Cập nhật thông tin bán hàng (Nhận hàng & Lên kệ)
+      case "updateManagerInfo":
+        // Kiểm tra quyền (Nếu muốn chặt chẽ)
+        // if (req.user.role !== 'manager') return res.status(403).json({error: "Không có quyền"});
+        tx = await contract.updateManagerInfo(
+          data.productId,
+          data.managerReceiveDate, // Thời gian nhận/lên kệ
+          data.managerReceiveImageUrl || "", // Ảnh quầy kệ
+          data.price // Giá bán
+        );
+        break;
+
+      // 6. RETAILER: Xác nhận đã bán (Deactivate) - Để kết thúc vòng đời
+      case "deactivateProduct":
+        // if (req.user.role !== 'manager') return res.status(403).json({error: "Không có quyền"});
+
+        // Lưu ý: Hàm này trong contract tên là deactivateProduct
+        tx = await contract.deactivateProduct(data.productId);
+        break;
       default:
         return res.status(400).json({ error: "Action không hợp lệ" });
     }

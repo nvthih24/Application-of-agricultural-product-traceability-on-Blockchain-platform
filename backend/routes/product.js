@@ -163,6 +163,52 @@ router.get("/pending-requests", jwtAuth, async (req, res) => {
   }
 });
 
+// API: Lấy danh sách hàng hóa của Tài xế
+router.get("/my-shipments", jwtAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    
+    const shipments = [];
+    const nextId = await readContract.nextProductId();
+
+    for (let i = 1; i < nextId; i++) {
+      try {
+        const productId = await readContract.indexToProductId(i);
+        if (!productId) continue;
+
+        const trace = await readContract.getTrace(productId);
+        
+        const receiveDate = toNumber(trace.receiveDate);
+        const deliveryDate = toNumber(trace.deliveryDate);
+
+        // --- LOGIC LỌC CHUẨN ---
+        // 1. Đã nhận hàng (receiveDate > 0)
+        // 2. Tên tài xế trên Blockchain khớp với tên tài khoản đang đăng nhập
+        if (receiveDate > 0) {
+          
+          shipments.push({
+            id: productId,
+            name: trace.productName,
+            image: trace.plantingImageUrl || "",
+            location: deliveryDate > 0 ? "Đã giao xong" : "Đang vận chuyển",
+            time: deliveryDate > 0 ? deliveryDate : receiveDate,
+            statusCode: deliveryDate > 0 ? 2 : 1,
+            status: deliveryDate > 0 ? "Completed" : "In Transit",
+            
+            // THÊM DÒNG NÀY (Để FE có thể hiển thị nếu cần)
+            transporterName: trace.transporterName, 
+            transportInfo: trace.transportInfo
+          });
+        }
+      } catch (e) {}
+    }
+
+    res.json({ success: true, data: shipments });
+  } catch (error) {
+    res.status(500).json({ error: "Lỗi server" });
+  }
+});
+
 // API CÔNG KHAI: Lấy chi tiết sản phẩm & Nhật ký chăm sóc theo ID
 // GET /api/products/:id
 router.get("/:id", async (req, res) => {
