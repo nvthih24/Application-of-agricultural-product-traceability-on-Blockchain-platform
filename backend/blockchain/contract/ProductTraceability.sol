@@ -47,6 +47,8 @@ contract ProductTraceability is AccessControl {
         uint8 harvestStatus;
         // === MỚI: Nhật ký chăm sóc ===
         CareLog[] careLogs;
+        uint256 harvestQuantity;  // san luong thu hoach
+        string harvestQuality;    // danh gia chat luong 
     }
 
     mapping(string => TraceInfo) public productTraces;
@@ -140,7 +142,10 @@ contract ProductTraceability is AccessControl {
         string memory _seedImageUrl,
         // THÊM 2 THAM SỐ NÀY VÀO ĐÂY
         string memory _creatorPhone,
-        string memory _creatorName
+        string memory _creatorName,
+        uint256 _harvestQuantity,
+        string memory _harvestQuality
+
     ) external onlyRole(FARMER_ROLE) returns (string memory) {
         require(
             bytes(productTraces[_productId].productId).length == 0,
@@ -174,7 +179,9 @@ contract ProductTraceability is AccessControl {
             transporter: address(0),
             plantingStatus: 0,
             harvestStatus: 0,
-            careLogs: new CareLog[](0)
+            careLogs: new CareLog[](0),
+            harvestQuantity: _harvestQuantity,
+            harvestQuality: _harvestQuality
         });
 
         farmerProducts[msg.sender].push(_productId);
@@ -227,7 +234,9 @@ contract ProductTraceability is AccessControl {
         string memory _productName,
         string memory _farmName,
         uint256 _harvestDate,
-        string memory _harvestImageUrl
+        string memory _harvestImageUrl,
+        uint256 _harvestQuantity,
+        string memory _harvestQuality
     ) external onlyRole(FARMER_ROLE) {
         TraceInfo storage trace = productTraces[_productId];
         require(bytes(trace.productId).length != 0, "Product not found");
@@ -242,6 +251,9 @@ contract ProductTraceability is AccessControl {
         trace.harvestDate = _harvestDate;
         trace.harvestImageUrl = _harvestImageUrl;
         trace.harvestStatus = 0;
+        trace.harvestQuantity = _harvestQuantity;
+        trace.harvestQuality = _harvestQuality;
+
 
         emit ProductUpdated(
             _productId,

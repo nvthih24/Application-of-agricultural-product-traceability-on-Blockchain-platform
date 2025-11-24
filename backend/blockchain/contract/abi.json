@@ -538,6 +538,16 @@
           "internalType": "string",
           "name": "_creatorName",
           "type": "string"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_harvestQuantity",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "_harvestQuality",
+          "type": "string"
         }
       ],
       "name": "addProduct",
@@ -841,6 +851,16 @@
               "internalType": "struct ProductTraceability.CareLog[]",
               "name": "careLogs",
               "type": "tuple[]"
+            },
+            {
+              "internalType": "uint256",
+              "name": "harvestQuantity",
+              "type": "uint256"
+            },
+            {
+              "internalType": "string",
+              "name": "harvestQuality",
+              "type": "string"
             }
           ],
           "internalType": "struct ProductTraceability.TraceInfo[]",
@@ -1019,6 +1039,16 @@
               "internalType": "struct ProductTraceability.CareLog[]",
               "name": "careLogs",
               "type": "tuple[]"
+            },
+            {
+              "internalType": "uint256",
+              "name": "harvestQuantity",
+              "type": "uint256"
+            },
+            {
+              "internalType": "string",
+              "name": "harvestQuality",
+              "type": "string"
             }
           ],
           "internalType": "struct ProductTraceability.TraceInfo[]",
@@ -1216,6 +1246,16 @@
               "internalType": "struct ProductTraceability.CareLog[]",
               "name": "careLogs",
               "type": "tuple[]"
+            },
+            {
+              "internalType": "uint256",
+              "name": "harvestQuantity",
+              "type": "uint256"
+            },
+            {
+              "internalType": "string",
+              "name": "harvestQuality",
+              "type": "string"
             }
           ],
           "internalType": "struct ProductTraceability.TraceInfo[]",
@@ -1394,6 +1434,16 @@
               "internalType": "struct ProductTraceability.CareLog[]",
               "name": "careLogs",
               "type": "tuple[]"
+            },
+            {
+              "internalType": "uint256",
+              "name": "harvestQuantity",
+              "type": "uint256"
+            },
+            {
+              "internalType": "string",
+              "name": "harvestQuality",
+              "type": "string"
             }
           ],
           "internalType": "struct ProductTraceability.TraceInfo[]",
@@ -1572,6 +1622,16 @@
               "internalType": "struct ProductTraceability.CareLog[]",
               "name": "careLogs",
               "type": "tuple[]"
+            },
+            {
+              "internalType": "uint256",
+              "name": "harvestQuantity",
+              "type": "uint256"
+            },
+            {
+              "internalType": "string",
+              "name": "harvestQuality",
+              "type": "string"
             }
           ],
           "internalType": "struct ProductTraceability.TraceInfo[]",
@@ -1769,6 +1829,16 @@
               "internalType": "struct ProductTraceability.CareLog[]",
               "name": "careLogs",
               "type": "tuple[]"
+            },
+            {
+              "internalType": "uint256",
+              "name": "harvestQuantity",
+              "type": "uint256"
+            },
+            {
+              "internalType": "string",
+              "name": "harvestQuality",
+              "type": "string"
             }
           ],
           "internalType": "struct ProductTraceability.TraceInfo",
@@ -2102,6 +2172,16 @@
           "internalType": "uint8",
           "name": "harvestStatus",
           "type": "uint8"
+        },
+        {
+          "internalType": "uint256",
+          "name": "harvestQuantity",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "harvestQuality",
+          "type": "string"
         }
       ],
       "stateMutability": "view",
@@ -2298,6 +2378,16 @@
         {
           "internalType": "string",
           "name": "_harvestImageUrl",
+          "type": "string"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_harvestQuantity",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "_harvestQuality",
           "type": "string"
         }
       ],
