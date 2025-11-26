@@ -51,12 +51,17 @@ class _LoginScreenState extends State<LoginScreen> {
         final data = jsonDecode(response.body);
         final String token = data['token'];
         final String role = data['user']['role'];
+        // Lấy companyName từ JSON (nếu null thì để rỗng)
+        final String companyName = data['user']['companyName'] ?? "";
 
         // Lưu token và role
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('token', token);
         await prefs.setString('role', role);
+        await prefs.setString('name', data['fullName'] ?? "Người dùng");
 
+        // Lưu tên công ty vào bộ nhớ máy
+        await prefs.setString('companyName', companyName);
         if (mounted) {
           _showMsg("Đăng nhập thành công!", isError: false);
 

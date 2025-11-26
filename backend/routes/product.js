@@ -13,20 +13,6 @@ const toNumber = (value) => {
   return Number(value);
 };
 
-// API Công khai: Lấy danh sách tất cả nông trại (Farmer)
-router.get("/farmers", async (req, res) => {
-  try {
-    // Tìm user có role là farmer
-    // .select('-password') nghĩa là lấy hết trừ mật khẩu ra (bảo mật)
-    const farmers = await User.find({ role: "farmer" }).select("-password");
-
-    res.json({ success: true, data: farmers });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Lỗi lấy danh sách nông dân" });
-  }
-});
-
 router.get("/my-products", jwtAuth, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId);
@@ -163,11 +149,15 @@ router.get("/pending-requests", jwtAuth, async (req, res) => {
   }
 });
 
-// API: Lấy danh sách hàng hóa của Tài xế
+// API: Lấy danh sách hàng hóa của Tài xế (Đang chở hoặc Đã giao)
 router.get("/my-shipments", jwtAuth, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId);
-    
+
+    // LẤY TÊN ĐỂ LỌC (Ưu tiên Tên Công Ty, nếu không có thì lấy Tên Thật)
+    const filterName = user.companyName ? user.companyName : user.fullName;
+    console.log("Đang lọc đơn hàng cho đơn vị:", filterName);
+
     const shipments = [];
     const nextId = await readContract.nextProductId();
 
@@ -177,34 +167,70 @@ router.get("/my-shipments", jwtAuth, async (req, res) => {
         if (!productId) continue;
 
         const trace = await readContract.getTrace(productId);
-        
         const receiveDate = toNumber(trace.receiveDate);
         const deliveryDate = toNumber(trace.deliveryDate);
 
-        // --- LOGIC LỌC CHUẨN ---
-        // 1. Đã nhận hàng (receiveDate > 0)
-        // 2. Tên tài xế trên Blockchain khớp với tên tài khoản đang đăng nhập
-        if (receiveDate > 0) {
-          
+        // ĐIỀU KIỆN LỌC:
+        // 1. Đơn hàng đã được quét nhận (receiveDate > 0)
+        // 2. Tên đơn vị vận chuyển trên Blockchain KHỚP với tên của User (Công ty hoặc Tên riêng)
+        if (receiveDate > 0 && trace.transporterName === filterName) {
           shipments.push({
             id: productId,
             name: trace.productName,
             image: trace.plantingImageUrl || "",
+            farmName: trace.farmName,
+            // Logic hiển thị vị trí/trạng thái
             location: deliveryDate > 0 ? "Đã giao xong" : "Đang vận chuyển",
             time: deliveryDate > 0 ? deliveryDate : receiveDate,
-            statusCode: deliveryDate > 0 ? 2 : 1,
+            statusCode: deliveryDate > 0 ? 2 : 1, // 1: Đang đi, 2: Đã xong
             status: deliveryDate > 0 ? "Completed" : "In Transit",
-            
-            // THÊM DÒNG NÀY (Để FE có thể hiển thị nếu cần)
-            transporterName: trace.transporterName, 
-            transportInfo: trace.transportInfo
+            // Trả thêm thông tin phụ để FE hiển thị nếu cần
+            transporterName: trace.transporterName,
+            transportInfo: trace.transportInfo,
+          });
+        }
+      } catch (e) {
+        // Bỏ qua lỗi nhỏ khi đọc từng item
+      }
+    }
+
+    res.json({ success: true, data: shipments });
+  } catch (error) {
+    console.error("Lỗi lấy danh sách vận chuyển:", error);
+    res.status(500).json({ error: "Lỗi server" });
+  }
+});
+
+// API CÔNG KHAI: Lấy danh sách sản phẩm của 1 nông dân cụ thể (qua SĐT)
+router.get("/by-farmer/:phone", async (req, res) => {
+  try {
+    const farmerPhone = req.params.phone;
+    const products = [];
+    const nextId = await readContract.nextProductId();
+
+    for (let i = 1; i < nextId; i++) {
+      try {
+        const productId = await readContract.indexToProductId(i);
+        if (!productId) continue;
+
+        const trace = await readContract.getTrace(productId);
+
+        // So sánh SĐT trên Blockchain với SĐT truyền vào
+        if (trace.creatorPhone === farmerPhone) {
+          products.push({
+            id: productId,
+            name: trace.productName,
+            image: trace.plantingImageUrl || "", // Lấy ảnh lúc trồng làm đại diện
+            status:
+              toNumber(trace.harvestDate) > 0 ? "Đã thu hoạch" : "Đang trồng",
           });
         }
       } catch (e) {}
     }
 
-    res.json({ success: true, data: shipments });
+    res.json({ success: true, data: products });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: "Lỗi server" });
   }
 });

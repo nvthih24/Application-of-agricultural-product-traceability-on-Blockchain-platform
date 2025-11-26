@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'login_screen.dart';
 import 'home_screen.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:mime/mime.dart';
+import 'package:http_parser/http_parser.dart';
 
 // Màu chủ đạo
 const Color kPrimaryColor = Color(0xFF00C853);
@@ -18,6 +24,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _userRole = "Khách";
   String _userName = "Người dùng";
   String _userEmail = "Chưa đăng nhập";
+  String _companyName = "";
+  bool _isTransporter = false;
+  String _userAvatar = "";
 
   @override
   void initState() {
@@ -30,22 +39,124 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
     final role = prefs.getString('role');
+    final name = prefs.getString('name');
+    final email = prefs.getString('email');
+    final company = prefs.getString('companyName'); // Lấy công ty từ bộ nhớ
+    final avatar = prefs.getString('avatar');
 
     // Lưu ý: Để hiện tên thật, lúc Login bạn cần lưu thêm Name/Email vào Prefs
     // Hoặc gọi API /me để lấy. Ở đây mình tạm giả lập dựa trên Role.
 
     setState(() {
-      _isLoggedIn = token != null;
+      _isLoggedIn = (token != null && token.isNotEmpty);
       if (_isLoggedIn) {
         _userRole = role == 'farmer'
             ? "Chủ Nông Trại"
             : role == 'transporter'
             ? "Nhà Vận Chuyển"
-            : "Người Tiêu Dùng";
-        _userName = "Nguyễn Văn A"; // Sau này lấy từ API
-        _userEmail = "user@gmail.com"; // Sau này lấy từ API
+            : role == 'manager'
+            ? "Nhà Bán Lẻ"
+            : "Kiểm Duyệt Viên";
+        _isTransporter = role == 'transporter';
+        _userName = name ?? "Người dùng";
+        _userEmail = email ?? "Chưa cập nhật";
+        _companyName = company ?? "Chưa cập nhật";
+        _userAvatar = avatar ?? "";
+      } else {
+        _userRole = "Khách";
+        _userName = "Người dùng";
       }
     });
+  }
+
+  // HÀM CẬP NHẬT CÔNG TY (Gọi API Backend)
+  Future<void> _updateCompanyDialog() async {
+    final controller = TextEditingController(
+      text: _companyName == "Chưa cập nhật" ? "" : _companyName,
+    );
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Cập nhật đơn vị vận chuyển"),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: "Tên công ty / Nhà xe",
+            hintText: "VD: 3TML Logistics",
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Hủy"),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await _callUpdateProfileAPI(controller.text);
+              Navigator.pop(context);
+            },
+            child: const Text("Lưu"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _callUpdateProfileAPI(String newCompany) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    try {
+      final response = await http.post(
+        Uri.parse('http://10.0.2.2:5000/api/auth/update-profile'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({"companyName": newCompany}),
+      );
+
+      if (response.statusCode == 200) {
+        // Lưu vào máy
+        await prefs.setString('companyName', newCompany);
+
+        // Cập nhật giao diện ngay lập tức
+        setState(() {
+          _companyName = newCompany;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Cập nhật thành công!"),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        // Nếu lỗi thì hiện thông báo đỏ lên màn hình luôn
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Lỗi Server: ${response.body}"),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print("--> LỖI KẾT NỐI: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Lỗi kết nối: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   // Hàm Đăng xuất
@@ -83,9 +194,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear(); // Xóa sạch token
 
-    // Hoặc chuyển hẳn về màn hình Login nếu muốn
     if (mounted) {
-      // Thay vì đến LoginScreen, hãy đưa họ về HomeScreen
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (context) => const HomeScreen()),
         (route) => false, // Xóa sạch lịch sử cũ
@@ -140,36 +249,168 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // Hàm gọi API update ví
+  // Hàm gọi API update ví (BẢN HOÀN CHỈNH)
   Future<void> _updateWallet(String address) async {
+    // 1. Validate cơ bản
     if (address.isEmpty || !address.startsWith("0x") || address.length != 42) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Địa chỉ ví không hợp lệ!"),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "Địa chỉ ví không hợp lệ! (Phải bắt đầu bằng 0x và dài 42 ký tự)",
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
       return;
     }
 
-    // ... Gọi API http.post('/api/auth/update-wallet') ...
-    // Nếu thành công thì setState lại biến _userWalletAddress
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Liên kết ví thành công!"),
-        backgroundColor: Colors.green,
-      ),
-    );
+    // 2. Lấy token
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    try {
+      // 3. Gọi API
+      final response = await http.post(
+        Uri.parse('http://10.0.2.2:5000/api/auth/update-wallet'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'walletAddress': address}),
+      );
+
+      // 4. Xử lý kết quả
+      if (response.statusCode == 200) {
+        // Thành công
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Liên kết ví thành công!"),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+        // (Tùy chọn) Lưu ví vào prefs nếu muốn dùng lại ở chỗ khác
+        await prefs.setString('walletAddress', address);
+      } else {
+        // Thất bại (Ví dụ: Ví đã được dùng bởi user khác)
+        final errorData = jsonDecode(response.body);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                "Lỗi: ${errorData['error'] ?? 'Cập nhật thất bại'}",
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Lỗi mạng
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Lỗi kết nối: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Hàm upload ảnh lên Server
+  Future<String?> _uploadImage(File imageFile) async {
+    try {
+      // URL upload ảnh của ông (check lại IP nếu dùng máy thật)
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('http://10.0.2.2:5000/api/upload/image'),
+      );
+      final mimeType = lookupMimeType(imageFile.path);
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'image',
+          imageFile.path,
+          contentType: MediaType.parse(mimeType ?? 'image/jpeg'),
+        ),
+      );
+      final response = await request.send();
+      if (response.statusCode == 200) {
+        final data = jsonDecode(await response.stream.bytesToString());
+        return data['url'];
+      }
+      return null;
+    } catch (e) {
+      print("Upload lỗi: $e");
+      return null;
+    }
+  }
+
+  // Hàm chọn ảnh và cập nhật Avatar
+  Future<void> _pickAndUploadAvatar() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+
+    if (image != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Đang tải ảnh lên...")));
+
+      // 1. Upload lấy link
+      String? imageUrl = await _uploadImage(File(image.path));
+
+      if (imageUrl != null) {
+        // 2. Gọi API cập nhật Profile với link ảnh mới
+        await _callUpdateAvatarAPI(imageUrl);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Lỗi upload ảnh"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Gọi API update profile chỉ để update avatar
+  Future<void> _callUpdateAvatarAPI(String url) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    try {
+      final response = await http.post(
+        Uri.parse('http://10.0.2.2:5000/api/auth/update-profile'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({"avatar": url}), // Chỉ gửi avatar
+      );
+
+      if (response.statusCode == 200) {
+        await prefs.setString('avatar', url); // Lưu vào máy
+        setState(() {
+          _userAvatar = url; // Cập nhật UI ngay
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Đổi ảnh đại diện thành công!"),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      print(e);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Nếu chưa đăng nhập -> Hiện giao diện Khách
-    if (!_isLoggedIn) {
-      return _buildGuestView();
-    }
+    if (!_isLoggedIn) return _buildGuestView();
 
-    // Nếu đã đăng nhập -> Hiện giao diện Profile xịn
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       body: SingleChildScrollView(
@@ -177,37 +418,64 @@ class _ProfileScreenState extends State<ProfileScreen> {
           children: [
             // 1. Header Profile (Màu xanh cong cong)
             Stack(
-              alignment: Alignment.center,
               children: [
-                Container(
-                  height: 180,
-                  decoration: const BoxDecoration(
-                    color: kPrimaryColor,
-                    borderRadius: BorderRadius.vertical(
-                      bottom: Radius.circular(30),
+                GestureDetector(
+                  onTap: _pickAndUploadAvatar, // <--- BẤM VÀO ĐỂ ĐỔI ẢNH
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: CircleAvatar(
+                      radius: 45,
+                      backgroundColor: Colors.grey[200],
+                      // Nếu có avatar thì hiện, không thì hiện ảnh mặc định
+                      backgroundImage: (_userAvatar.isNotEmpty)
+                          ? NetworkImage(_userAvatar) as ImageProvider
+                          : const AssetImage('assets/images/farm_1.jpg'),
                     ),
                   ),
                 ),
+                // Thêm icon máy ảnh nhỏ nhỏ bên cạnh cho người ta biết là bấm được
                 Positioned(
-                  bottom: 0, // Avatar nằm đè lên vạch
+                  bottom: 0,
+                  right: 0,
                   child: Container(
-                    decoration: BoxDecoration(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 4),
                     ),
-                    child: const CircleAvatar(
-                      radius: 50,
-                      backgroundImage: AssetImage(
-                        'assets/images/farm_1.jpg',
-                      ), // Ảnh đại diện giả
+                    child: const Icon(
+                      Icons.camera_alt,
+                      size: 16,
+                      color: Colors.grey,
                     ),
                   ),
                 ),
               ],
             ),
 
-            const SizedBox(height: 15),
+            const SizedBox(height: 20),
 
+            // SECTION: THÔNG TIN VẬN CHUYỂN (Chỉ hiện cho Transporter)
+            if (_isTransporter)
+              Card(
+                margin: const EdgeInsets.symmetric(horizontal: 20),
+                child: ListTile(
+                  leading: const Icon(Icons.local_shipping, color: Colors.blue),
+                  title: const Text("Công ty / Đơn vị"),
+                  subtitle: Text(
+                    _companyName,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  trailing: const Icon(Icons.edit, color: Colors.grey),
+                  onTap: _updateCompanyDialog,
+                ),
+              ),
+
+            const SizedBox(height: 20),
             // Tên và Vai trò
             Text(
               _userName,

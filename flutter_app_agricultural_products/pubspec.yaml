@@ -46,6 +46,7 @@ dependencies:
   mobile_scanner: ^5.1.0 # Thư viện quét mã QR
   url_launcher: ^6.1.11 # Mở trình duyệt web
   qr_flutter: ^4.1.0
+  carousel_slider: ^5.1.1
 
 dev_dependencies:
   flutter_test:

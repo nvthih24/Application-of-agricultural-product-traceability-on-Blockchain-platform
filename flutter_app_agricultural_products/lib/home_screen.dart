@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'qr_scanner_screen.dart'; // Import màn hình quét QR cũ của bạn
-import 'farm_detail_screen.dart';
-import 'profile_screen.dart';
+import 'package:carousel_slider/carousel_slider.dart'; // Nhớ import cái này
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-// Màu sắc chủ đạo lấy từ thiết kế của bạn
-const Color kPrimaryColor = Color(0xFF00C853); // Xanh lá
-const Color kAccentColor = Color(0xFFFF6D00); // Cam đậm (cho nút bấm)
+import 'qr_scanner_screen.dart';
+import 'farm_detail_screen.dart';
+import 'profile_screen.dart';
+
+const Color kPrimaryColor = Color(0xFF00C853);
 const Color kBackgroundColor = Color(0xFFF5F5F5);
 
 class HomeScreen extends StatefulWidget {
@@ -18,30 +18,24 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _selectedIndex =
-      0; // Biến để theo dõi tab đang chọn (0: Home, 3: Profile)
+  int _selectedIndex = 0;
 
-  // Danh sách các màn hình tương ứng với các Tab
   static final List<Widget> _widgetOptions = <Widget>[
-    const HomeContent(), // Tab 0: Trang chủ (Code cũ nằm ở đây)
-    const Center(child: Text("Đang nâng cấp (Saved)")), // Tab 1
-    const Center(child: Text("Đang nâng cấp (Orders)")), // Tab 2
-    const ProfileScreen(), // Tab 3: Tài khoản & Đăng nhập (CÁI BẠN CẦN)
+    const HomeContent(),
+    const Center(child: Text("Đang nâng cấp (Saved)")),
+    const Center(child: Text("Đang nâng cấp (Orders)")),
+    const ProfileScreen(),
   ];
 
   void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index; // Cập nhật tab khi bấm
-    });
+    setState(() => _selectedIndex = index);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kBackgroundColor,
-      // Nội dung thay đổi dựa theo tab đang chọn
       body: _widgetOptions.elementAt(_selectedIndex),
-
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
@@ -53,7 +47,6 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.receipt_long),
             label: 'Orders',
           ),
-          // ▼▼▼ ĐÂY LÀ CHỖ ĐĂNG NHẬP ▼▼▼
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),
             label: 'Profile',
@@ -63,14 +56,14 @@ class _HomeScreenState extends State<HomeScreen> {
         selectedItemColor: kPrimaryColor,
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
-        onTap: _onItemTapped, // Bắt sự kiện bấm
+        onTap: _onItemTapped,
       ),
     );
   }
 }
 
 // ====================
-// GIAO DIỆN TRANG CHỦ
+// PHẦN NỘI DUNG TRANG CHỦ (NÂNG CẤP)
 // ====================
 class HomeContent extends StatefulWidget {
   const HomeContent({super.key});
@@ -80,8 +73,19 @@ class HomeContent extends StatefulWidget {
 }
 
 class _HomeContentState extends State<HomeContent> {
-  List<dynamic> _farms = [];
+  List<dynamic> _allFarms = []; // Danh sách gốc
+  List<dynamic> _filteredFarms = []; // Danh sách hiển thị
   bool _isLoading = true;
+
+  String _searchKeyword = "";
+  String _selectedCategory = "Tất cả"; // Filter mặc định
+
+  // Danh sách Banner quảng cáo
+  final List<String> imgList = [
+    'assets/images/banner-2.jpg', // Ảnh 1 (Nhớ đảm bảo file tồn tại)
+    'assets/images/farm_1.jpg', // Ảnh 2
+    'assets/images/fruit.png', // Ảnh 3
+  ];
 
   @override
   void initState() {
@@ -89,34 +93,59 @@ class _HomeContentState extends State<HomeContent> {
     _fetchFarms();
   }
 
-  // Hàm gọi API lấy danh sách nông dân
   Future<void> _fetchFarms() async {
     try {
-      // Lưu ý: Đây là API công khai, không cần Token
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:5000/api/products/farmers'),
+        Uri.parse('http://10.0.2.2:5000/api/auth/farmers'),
       );
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() {
-          _farms = data['data']; // Gán dữ liệu vào list
+          _allFarms = data['data'];
+          _filteredFarms = _allFarms; // Ban đầu hiển thị hết
           _isLoading = false;
         });
       } else {
-        // Lỗi nhẹ thì cứ cho list rỗng, tắt loading
         setState(() => _isLoading = false);
       }
     } catch (e) {
-      print("Lỗi kết nối: $e");
+      print("Lỗi: $e");
       setState(() => _isLoading = false);
     }
+  }
+
+  // Logic Lọc (Kết hợp Tìm kiếm & Danh mục)
+  void _runFilter() {
+    List<dynamic> results = _allFarms;
+
+    // 1. Lọc theo Search Text
+    if (_searchKeyword.isNotEmpty) {
+      results = results.where((farm) {
+        final name = (farm['fullName'] ?? "").toLowerCase();
+        final address = (farm['address'] ?? "").toLowerCase();
+        return name.contains(_searchKeyword.toLowerCase()) ||
+            address.contains(_searchKeyword.toLowerCase());
+      }).toList();
+    }
+
+    // 2. Lọc theo Danh mục (Giả lập logic)
+    // Vì DB chưa có field category, nên ta giả bộ lọc theo tên
+    if (_selectedCategory != "Tất cả") {
+      // Ví dụ: Nếu chọn "Rau củ", lọc những ông có tên chứa chữ "Rau" hoặc "Farm"
+      // (Đây là logic tạm để demo hiệu ứng lọc)
+      // results = results.where((farm) => farm['fullName'].toString().contains("Farm")).toList();
+    }
+
+    setState(() {
+      _filteredFarms = results;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kBackgroundColor,
+      // APP BAR
       appBar: AppBar(
         backgroundColor: kPrimaryColor,
         elevation: 0,
@@ -131,26 +160,24 @@ class _HomeContentState extends State<HomeContent> {
         actions: [
           IconButton(
             icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const QrScannerScreen(),
-                ),
-              );
-            },
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const QrScannerScreen()),
+            ),
           ),
         ],
       ),
+
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. BANNER (Giữ nguyên code cũ của ông cho đẹp)
+            // 1. BANNER CHẠY TỰ ĐỘNG (CAROUSEL)
             Stack(
               children: [
+                // Nền xanh cong cong ở dưới cùng
                 Container(
-                  height: 100,
+                  height: 80,
                   decoration: const BoxDecoration(
                     color: kPrimaryColor,
                     borderRadius: BorderRadius.only(
@@ -159,41 +186,96 @@ class _HomeContentState extends State<HomeContent> {
                     ),
                   ),
                 ),
+
                 Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 10,
-                  ),
-                  child: Container(
-                    width: double.infinity,
-                    height: 160,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF3E0),
-                      borderRadius: BorderRadius.circular(20),
-                      image: const DecorationImage(
-                        // Dùng ảnh thật hoặc ảnh mạng nếu có
-                        image: AssetImage('assets/images/banner-2.jpg'),
-                        fit: BoxFit.cover,
-                        opacity: 0.8,
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Stack(
+                    alignment: Alignment.bottomLeft, // Căn chữ ở góc dưới trái
+                    children: [
+                      // LỚP 1: ẢNH CHẠY (CAROUSEL)
+                      CarouselSlider(
+                        options: CarouselOptions(
+                          height: 160.0,
+                          autoPlay: true,
+                          autoPlayInterval: const Duration(seconds: 4),
+                          enlargeCenterPage: true, // Phóng to ảnh giữa
+                          viewportFraction: 0.9,
+                        ),
+                        items: imgList.map((item) {
+                          return Builder(
+                            builder: (BuildContext context) {
+                              return Container(
+                                width: MediaQuery.of(context).size.width,
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 5.0,
+                                ),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(15),
+                                  image: DecorationImage(
+                                    image: AssetImage(item),
+                                    fit: BoxFit.cover,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black26,
+                                      blurRadius: 5,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                // Lớp phủ đen mờ (Gradient) đi theo ảnh để ảnh nào cũng tối phần dưới cho dễ đọc chữ
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(15),
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        Colors.transparent,
+                                        Colors.black.withOpacity(0.7),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        }).toList(),
                       ),
-                    ),
-                    child: const Padding(
-                      padding: EdgeInsets.all(20.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            "Minh bạch\ntừ nông trại\nđến bàn ăn.",
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+
+                      // LỚP 2: CHỮ ĐỨNG YÊN (Nằm đè lên trên Carousel)
+                      // Vì Carousel có viewportFraction=0.9 và margin, nên ta căn chỉnh Positioned cho khớp
+                      const Positioned(
+                        bottom: 20,
+                        left: 35, // Căn lề trái cho khớp với mép ảnh giữa
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Nông sản sạch",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                shadows: [
+                                  Shadow(blurRadius: 5, color: Colors.black),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
+                            Text(
+                              "Cho mọi nhà",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                shadows: [
+                                  Shadow(blurRadius: 5, color: Colors.black),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
               ],
@@ -201,14 +283,42 @@ class _HomeContentState extends State<HomeContent> {
 
             const SizedBox(height: 20),
 
-            // 2. DANH MỤC (Giữ nguyên)
+            // 2. THANH TÌM KIẾM
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: TextField(
+                onChanged: (value) {
+                  _searchKeyword = value;
+                  _runFilter();
+                },
+                decoration: InputDecoration(
+                  hintText: "Tìm nông trại, địa chỉ...",
+                  prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(15),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    vertical: 0,
+                    horizontal: 20,
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // 3. BỘ LỌC DANH MỤC (CATEGORY CHIPS)
             _buildSectionTitle("Danh mục", () {}),
             SizedBox(
-              height: 60,
+              height: 50,
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 children: [
+                  _buildCategoryChip("Tất cả", Icons.apps),
                   _buildCategoryChip("Rau củ", Icons.eco),
                   _buildCategoryChip("Trái cây", Icons.circle),
                   _buildCategoryChip("Gạo", Icons.grass),
@@ -219,26 +329,25 @@ class _HomeContentState extends State<HomeContent> {
 
             const SizedBox(height: 20),
 
-            // 3. NÔNG TRẠI NỔI BẬT (DATA THẬT)
+            // 4. DANH SÁCH NÔNG TRẠI (REAL DATA)
             _buildSectionTitle("Nông trại tiêu biểu", () {}),
 
-            // Hiển thị List thật
             _isLoading
                 ? const Center(
                     child: CircularProgressIndicator(color: kPrimaryColor),
                   )
-                : _farms.isEmpty
+                : _filteredFarms.isEmpty
                 ? const Padding(
-                    padding: EdgeInsets.all(20),
-                    child: Text("Chưa có nông trại nào đăng ký."),
+                    padding: EdgeInsets.all(30),
+                    child: Center(child: Text("Không tìm thấy nông trại nào.")),
                   )
                 : ListView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _farms.length,
+                    itemCount: _filteredFarms.length,
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     itemBuilder: (context, index) {
-                      return _buildFarmCard(context, _farms[index]);
+                      return _buildFarmCard(context, _filteredFarms[index]);
                     },
                   ),
 
@@ -252,7 +361,7 @@ class _HomeContentState extends State<HomeContent> {
   // Widget Tiêu đề
   Widget _buildSectionTitle(String title, VoidCallback onPress) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -264,39 +373,71 @@ class _HomeContentState extends State<HomeContent> {
               color: kPrimaryColor,
             ),
           ),
-          // GestureDetector(onTap: onPress, child: const Text("Xem tất cả", style: TextStyle(color: Colors.grey))),
+          // GestureDetector(onTap: onPress, child: const Text("Xem thêm", style: TextStyle(color: Colors.grey))),
         ],
       ),
     );
   }
 
-  // Widget Chip Danh mục
+  // Widget Category Chip (Đã có logic đổi màu)
   Widget _buildCategoryChip(String label, IconData icon) {
-    return Container(
-      margin: const EdgeInsets.only(right: 15),
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.green, size: 20),
-          const SizedBox(width: 8),
-          Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-        ],
+    bool isSelected = _selectedCategory == label;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedCategory = label;
+          _runFilter();
+        });
+      },
+      child: Container(
+        margin: const EdgeInsets.only(right: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? kPrimaryColor : Colors.white,
+          borderRadius: BorderRadius.circular(25),
+          border: Border.all(
+            color: isSelected ? kPrimaryColor : Colors.grey.shade300,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: kPrimaryColor.withOpacity(0.3),
+                    blurRadius: 5,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : [],
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? Colors.white : Colors.green,
+              size: 18,
+            ),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: isSelected ? Colors.white : Colors.black87,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  // Widget Card Nông Trại (ĐÃ SỬA ĐỂ NHẬN DATA THẬT)
+  // Widget Farm Card (Giữ nguyên logic hiển thị ảnh thật)
   Widget _buildFarmCard(BuildContext context, dynamic farm) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => const FarmDetailScreen()),
+          MaterialPageRoute(
+            builder: (context) => FarmDetailScreen(farmData: farm),
+          ),
         );
       },
       child: Container(
@@ -316,17 +457,30 @@ class _HomeContentState extends State<HomeContent> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Ảnh cover (Vì User chưa có chức năng up ảnh bìa, ta dùng ảnh random hoặc mặc định)
             ClipRRect(
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(20),
               ),
-              child: Image.asset(
-                'assets/images/farm_1.jpg', // Dùng ảnh mặc định cho đẹp
-                height: 150,
-                width: double.infinity,
-                fit: BoxFit.cover,
-              ),
+              child:
+                  (farm['avatar'] != null &&
+                      farm['avatar'].toString().isNotEmpty)
+                  ? Image.network(
+                      farm['avatar'],
+                      height: 150,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Image.asset(
+                        'assets/images/farm_1.jpg',
+                        fit: BoxFit.cover,
+                        height: 150,
+                      ),
+                    )
+                  : Image.asset(
+                      'assets/images/farm_1.jpg',
+                      height: 150,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
             ),
             Padding(
               padding: const EdgeInsets.all(15),
@@ -336,19 +490,14 @@ class _HomeContentState extends State<HomeContent> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // HIỂN THỊ TÊN THẬT CỦA FARMER
                       Text(
-                        farm['fullName'] ?? "Nông trại ẩn danh",
+                        farm['fullName'] ?? "Nông trại",
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const Icon(
-                        Icons.verified,
-                        color: Colors.blue,
-                        size: 20,
-                      ), // Thêm cái tick xanh cho uy tín
+                      const Icon(Icons.verified, color: Colors.blue, size: 20),
                     ],
                   ),
                   const SizedBox(height: 5),
@@ -360,17 +509,14 @@ class _HomeContentState extends State<HomeContent> {
                         color: Colors.grey[600],
                       ),
                       const SizedBox(width: 5),
-                      // HIỂN THỊ ĐỊA CHỈ THẬT
-                      Text(
-                        farm['address'] ?? "Chưa cập nhật địa chỉ",
-                        style: TextStyle(color: Colors.grey[600]),
+                      Expanded(
+                        child: Text(
+                          farm['address'] ?? "Chưa cập nhật",
+                          style: TextStyle(color: Colors.grey[600]),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    "SĐT: ${farm['phone']}",
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                 ],
               ),

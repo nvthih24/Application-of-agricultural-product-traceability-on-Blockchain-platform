@@ -74,7 +74,7 @@ case "harvestProduct":
         
         tx = await contract.updateReceive(
           data.productId,
-          data.transporterName || currentUser.fullName, // Tên tài xế
+          data.transporterName,
           data.receiveDate, // Thời gian nhận
           data.receiveImageUrl || "", // Ảnh nhận hàng (nếu có)
           data.transportInfo || "Xe vận chuyển" // Biển số xe / Ghi chú
@@ -85,7 +85,7 @@ case "harvestProduct":
       case "updateDelivery":
         tx = await contract.updateDelivery(
           data.productId,
-          data.transporterName || currentUser.fullName,
+          data.transporterName,
           data.deliveryDate,
           data.deliveryImageUrl || "",
           data.transportInfo || "Giao thành công"

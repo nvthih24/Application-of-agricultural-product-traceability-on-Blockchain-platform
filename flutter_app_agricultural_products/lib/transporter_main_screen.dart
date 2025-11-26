@@ -3,11 +3,14 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'login_screen.dart';
 import 'qr_scanner_screen.dart';
+import 'profile_screen.dart'; // Nhớ import Profile
 
 const Color kTransporterColor = Color(0xFF01579B);
 
+// ==========================================
+// 1. MÀN HÌNH CHÍNH (CHỨA MENU DƯỚI ĐÁY)
+// ==========================================
 class TransporterMainScreen extends StatefulWidget {
   const TransporterMainScreen({super.key});
 
@@ -16,6 +19,57 @@ class TransporterMainScreen extends StatefulWidget {
 }
 
 class _TransporterMainScreenState extends State<TransporterMainScreen> {
+  int _selectedIndex = 0;
+
+  // Danh sách các Tab
+  static final List<Widget> _pages = [
+    const TransporterDashboardTab(), // Tab 0: Dashboard chính
+    const Center(child: Text("Thông báo (Đang phát triển)")), // Tab 1
+    const ProfileScreen(), // Tab 2: Tài khoản
+  ];
+
+  void _onItemTapped(int index) {
+    setState(() => _selectedIndex = index);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: _pages[_selectedIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.local_shipping),
+            label: 'Vận chuyển',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.notifications),
+            label: 'Thông báo',
+          ),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Tài khoản'),
+        ],
+        currentIndex: _selectedIndex,
+        selectedItemColor: kTransporterColor,
+        unselectedItemColor: Colors.grey,
+        onTap: _onItemTapped,
+        type: BottomNavigationBarType.fixed,
+      ),
+    );
+  }
+}
+
+// ================
+// 2. TAB DASHBOARD
+// ================
+class TransporterDashboardTab extends StatefulWidget {
+  const TransporterDashboardTab({super.key});
+
+  @override
+  State<TransporterDashboardTab> createState() =>
+      _TransporterDashboardTabState();
+}
+
+class _TransporterDashboardTabState extends State<TransporterDashboardTab> {
   List<dynamic> myShipments = [];
   bool _isLoading = true;
 
@@ -25,7 +79,7 @@ class _TransporterMainScreenState extends State<TransporterMainScreen> {
     _loadShipments();
   }
 
-  // 1. GỌI API LẤY DANH SÁCH ĐƠN HÀNG
+  // Gọi API lấy danh sách
   Future<void> _loadShipments() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
@@ -50,30 +104,32 @@ class _TransporterMainScreenState extends State<TransporterMainScreen> {
     }
   }
 
-  // 2. XỬ LÝ QUÉT MÃ NHẬN HÀNG (PICKUP)
+  // Xử lý quét mã nhận hàng
   Future<void> _scanToReceive() async {
-    // Mở Camera quét mã
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => const QrScannerScreen(isReturnData: true),
       ),
-      // Lưu ý: Cần sửa QrScannerScreen chút xíu để nó trả về dữ liệu thay vì push trang mới
-      // Nếu ông chưa sửa file QR, thì dùng tạm cách nhập tay bên dưới hoặc sửa file QR sau.
     );
 
-    // Nếu quét được mã (Ví dụ result là 'BATCH-123...')
     if (result != null && result.toString().isNotEmpty) {
       _callReceiveAPI(result.toString());
     }
   }
 
-  // Gọi API nhận hàng
+  // Gọi API Update Receive
   Future<void> _callReceiveAPI(String productId) async {
     setState(() => _isLoading = true);
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
-    final name = prefs.getString('name') ?? "Tài xế";
+
+    // Logic lấy tên chuẩn để khớp với Backend
+    final companyName = prefs.getString('companyName');
+    final fullName = prefs.getString('name');
+    final submitName = (companyName != null && companyName.isNotEmpty)
+        ? companyName
+        : (fullName ?? "Tài xế");
 
     try {
       final response = await http.post(
@@ -85,10 +141,10 @@ class _TransporterMainScreenState extends State<TransporterMainScreen> {
         body: jsonEncode({
           "action": "updateReceive",
           "productId": productId,
-          "transporterName": name, // Gửi tên thật để lọc
+          "transporterName": submitName, // Gửi tên chuẩn
           "receiveDate": (DateTime.now().millisecondsSinceEpoch / 1000).floor(),
-          "receiveImageUrl": "", // Có thể thêm chụp ảnh xác nhận
-          "transportInfo": "Xe lạnh 29C-12345",
+          "receiveImageUrl": "",
+          "transportInfo": "Xe lạnh (Tài xế: ${fullName ?? 'N/A'})",
         }),
       );
 
@@ -99,38 +155,47 @@ class _TransporterMainScreenState extends State<TransporterMainScreen> {
             backgroundColor: Colors.green,
           ),
         );
+
         Future.delayed(const Duration(seconds: 3), () {
-          if (mounted) {
-            _loadShipments(); // Gọi hàm này để refresh trang
-          }
+          if (mounted) _loadShipments();
         });
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Lỗi: ${response.body}"),
-            backgroundColor: Colors.red,
-          ),
-        );
+        String errorMsg = response.body;
+        if (errorMsg.contains("already updated")) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Đơn này đã được nhận rồi!"),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Lỗi: $errorMsg"),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
       print(e);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Lỗi kết nối"),
-          backgroundColor: Colors.red,
-        ),
-      );
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
-  // 3. XỬ LÝ GIAO HÀNG (DELIVERY)
+  // Gọi API Giao hàng
   Future<void> _confirmDelivery(String productId) async {
     setState(() => _isLoading = true);
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
-    final name = prefs.getString('name') ?? "Tài xế";
+
+    // Logic lấy tên chuẩn (giống hàm Receive)
+    final companyName = prefs.getString('companyName');
+    final fullName = prefs.getString('name');
+    final submitName = (companyName != null && companyName.isNotEmpty)
+        ? companyName
+        : (fullName ?? "Tài xế");
 
     try {
       final response = await http.post(
@@ -140,26 +205,24 @@ class _TransporterMainScreenState extends State<TransporterMainScreen> {
           'Authorization': 'Bearer $token',
         },
         body: jsonEncode({
-          "action": "updateReceive",
+          "action": "updateDelivery",
           "productId": productId,
           "transporterName":
-              name, // QUAN TRỌNG: Gửi tên mình lên để "đánh dấu chủ quyền"
-          "receiveDate": (DateTime.now().millisecondsSinceEpoch / 1000).floor(),
-          "receiveImageUrl": "",
-          "transportInfo": "Xe lạnh 29C-12345",
+              submitName, // Phải trùng tên lúc nhận thì contract mới cho giao
+          "deliveryDate": (DateTime.now().millisecondsSinceEpoch / 1000)
+              .floor(),
+          "deliveryImageUrl": "",
+          "transportInfo": "Giao thành công tại kho",
         }),
       );
 
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("Đã nhận hàng thành công!"),
+            content: Text("Giao hàng thành công!"),
             backgroundColor: Colors.green,
           ),
         );
-
-        // CHỜ 3 GIÂY ĐỂ BLOCKCHAIN CẬP NHẬT
-        // Sau đó gọi _loadShipments: Lúc này API sẽ thấy transporterName == user.fullName -> Trả về list
         Future.delayed(const Duration(seconds: 3), () {
           if (mounted) _loadShipments();
         });
@@ -178,7 +241,6 @@ class _TransporterMainScreenState extends State<TransporterMainScreen> {
     }
   }
 
-  // Hàm mở Google Maps
   Future<void> _openMap(String address) async {
     final Uri googleUrl = Uri.parse(
       'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(address)}',
@@ -196,17 +258,6 @@ class _TransporterMainScreenState extends State<TransporterMainScreen> {
     }
   }
 
-  Future<void> _logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-    if (mounted) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-        (route) => false,
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -217,15 +268,9 @@ class _TransporterMainScreenState extends State<TransporterMainScreen> {
           "Dashboard Vận Chuyển",
           style: TextStyle(color: Colors.white),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: _logout,
-          ),
-        ],
+        automaticallyImplyLeading: false, // Tắt nút back thừa
       ),
 
-      // NÚT QUÉT QR NHẬN HÀNG
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _scanToReceive,
         backgroundColor: kTransporterColor,
@@ -259,8 +304,11 @@ class _TransporterMainScreenState extends State<TransporterMainScreen> {
   Widget _buildTransportCard(Map<String, dynamic> item) {
     int status = item['statusCode'] ?? 1;
     bool isInTransit = (status == 1);
-    String location = item['location'] ?? "Không xác định";
+    String farmName = item['farmName'] ?? "Nông trại";
 
+    String locationDisplay = isInTransit
+        ? "Từ: $farmName ➡️ Kho Tổng" // Dữ liệu thật kết hợp logic
+        : "Đã giao tại Siêu Thị";
     return Card(
       margin: const EdgeInsets.only(bottom: 15),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -305,8 +353,6 @@ class _TransporterMainScreenState extends State<TransporterMainScreen> {
                         ),
                       ),
                       const SizedBox(height: 5),
-
-                      // NÚT CHỈ ĐƯỜNG
                       InkWell(
                         onTap: isInTransit
                             ? () => _openMap("Kho trung chuyển")
@@ -320,7 +366,7 @@ class _TransporterMainScreenState extends State<TransporterMainScreen> {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              location,
+                              locationDisplay,
                               style: TextStyle(
                                 color: isInTransit ? Colors.blue : Colors.black,
                                 decoration: isInTransit
@@ -336,24 +382,58 @@ class _TransporterMainScreenState extends State<TransporterMainScreen> {
                 ),
               ],
             ),
-
             // NÚT HÀNH ĐỘNG (CHỈ HIỆN KHI ĐANG ĐI)
             if (isInTransit) ...[
               const SizedBox(height: 12),
-              const Divider(),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () => _confirmDelivery(item['id']),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kTransporterColor,
+              const Divider(height: 1),
+              const SizedBox(height: 10),
+
+              Row(
+                children: [
+                  // NÚT 1: CẬP NHẬT NHIỆT ĐỘ / TRẠNG THÁI
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        // Gọi hàm show dialog cập nhật (nếu chưa có thì tạo hàm giả hoặc bỏ qua)
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("Tính năng đang phát triển"),
+                          ),
+                        );
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: kTransporterColor,
+                        side: const BorderSide(color: kTransporterColor),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                      icon: const Icon(Icons.thermostat, size: 18),
+                      label: const Text("Cập nhật"),
+                    ),
                   ),
-                  icon: const Icon(Icons.check_circle, color: Colors.white),
-                  label: const Text(
-                    "Xác nhận đã giao",
-                    style: TextStyle(color: Colors.white),
+
+                  const SizedBox(width: 10),
+
+                  // NÚT 2: XÁC NHẬN GIAO
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => _confirmDelivery(item['id']),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: kTransporterColor,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        elevation: 0,
+                      ),
+                      icon: const Icon(
+                        Icons.check,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                      label: const Text(
+                        "Đã Giao",
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ],
           ],
