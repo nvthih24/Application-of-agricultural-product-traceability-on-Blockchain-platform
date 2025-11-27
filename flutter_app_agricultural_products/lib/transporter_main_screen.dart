@@ -4,7 +4,11 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'qr_scanner_screen.dart';
-import 'profile_screen.dart'; // Nhớ import Profile
+import 'profile_screen.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:mime/mime.dart';
+import 'package:http_parser/http_parser.dart';
 
 const Color kTransporterColor = Color(0xFF01579B);
 
@@ -114,12 +118,13 @@ class _TransporterDashboardTabState extends State<TransporterDashboardTab> {
     );
 
     if (result != null && result.toString().isNotEmpty) {
-      _callReceiveAPI(result.toString());
+      // Thay vì gọi API luôn, ta gọi Dialog chụp ảnh
+      _showEvidenceDialog(context, result.toString(), isReceiving: true);
     }
   }
 
   // Gọi API Update Receive
-  Future<void> _callReceiveAPI(String productId) async {
+  Future<void> _callReceiveAPI(String productId, [String? imageUrl]) async {
     setState(() => _isLoading = true);
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
@@ -130,6 +135,7 @@ class _TransporterDashboardTabState extends State<TransporterDashboardTab> {
     final submitName = (companyName != null && companyName.isNotEmpty)
         ? companyName
         : (fullName ?? "Tài xế");
+    final imageUrl = ""; // Ảnh kiện hàng lúc nhận (nếu có)
 
     try {
       final response = await http.post(
@@ -143,7 +149,7 @@ class _TransporterDashboardTabState extends State<TransporterDashboardTab> {
           "productId": productId,
           "transporterName": submitName, // Gửi tên chuẩn
           "receiveDate": (DateTime.now().millisecondsSinceEpoch / 1000).floor(),
-          "receiveImageUrl": "",
+          "receiveImageUrl": imageUrl ?? "",
           "transportInfo": "Xe lạnh (Tài xế: ${fullName ?? 'N/A'})",
         }),
       );
@@ -185,7 +191,7 @@ class _TransporterDashboardTabState extends State<TransporterDashboardTab> {
   }
 
   // Gọi API Giao hàng
-  Future<void> _confirmDelivery(String productId) async {
+  Future<void> _callDeliveryAPI(String productId, [String? imageUrl]) async {
     setState(() => _isLoading = true);
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
@@ -211,7 +217,7 @@ class _TransporterDashboardTabState extends State<TransporterDashboardTab> {
               submitName, // Phải trùng tên lúc nhận thì contract mới cho giao
           "deliveryDate": (DateTime.now().millisecondsSinceEpoch / 1000)
               .floor(),
-          "deliveryImageUrl": "",
+          "deliveryImageUrl": imageUrl ?? "",
           "transportInfo": "Giao thành công tại kho",
         }),
       );
@@ -416,7 +422,11 @@ class _TransporterDashboardTabState extends State<TransporterDashboardTab> {
                   // NÚT 2: XÁC NHẬN GIAO
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () => _confirmDelivery(item['id']),
+                      onPressed: () => _showEvidenceDialog(
+                        context,
+                        item['id'],
+                        isReceiving: false,
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: kTransporterColor,
                         padding: const EdgeInsets.symmetric(vertical: 10),
@@ -439,6 +449,142 @@ class _TransporterDashboardTabState extends State<TransporterDashboardTab> {
           ],
         ),
       ),
+    );
+  }
+
+  // Hàm upload ảnh (Dùng chung cho cả Nhận và Giao)
+  Future<String?> _uploadImage(File imageFile) async {
+    try {
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('http://10.0.2.2:5000/api/upload/image'),
+      );
+      final mimeType = lookupMimeType(imageFile.path);
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'image',
+          imageFile.path,
+          contentType: MediaType.parse(mimeType ?? 'image/jpeg'),
+        ),
+      );
+      final response = await request.send();
+      if (response.statusCode == 200) {
+        final data = jsonDecode(await response.stream.bytesToString());
+        return data['url'];
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  void _showEvidenceDialog(
+    BuildContext context,
+    String productId, {
+    required bool isReceiving,
+  }) {
+    File? evidenceImage;
+    bool isUploading = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text(
+                isReceiving ? "Xác nhận Nhận Hàng" : "Xác nhận Giao Hàng",
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    "Vui lòng chụp ảnh ${isReceiving ? 'kiện hàng lúc nhận' : 'hàng tại điểm giao'} để làm bằng chứng.",
+                  ),
+                  const SizedBox(height: 15),
+
+                  // Khung ảnh
+                  InkWell(
+                    onTap: () async {
+                      final ImagePicker picker = ImagePicker();
+                      final XFile? img = await picker.pickImage(
+                        source: ImageSource.camera,
+                      ); // Bắt buộc dùng Camera
+                      if (img != null) {
+                        setDialogState(() => evidenceImage = File(img.path));
+                      }
+                    },
+                    child: Container(
+                      height: 150,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: evidenceImage != null
+                          ? Image.file(evidenceImage!, fit: BoxFit.cover)
+                          : const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.camera_alt, size: 40),
+                                Text("Chụp ảnh"),
+                              ],
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Hủy"),
+                ),
+
+                ElevatedButton(
+                  onPressed: isUploading
+                      ? null
+                      : () async {
+                          if (evidenceImage == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("Chưa có ảnh bằng chứng!"),
+                              ),
+                            );
+                            return;
+                          }
+
+                          setDialogState(
+                            () => isUploading = true,
+                          ); // Hiện loading
+
+                          // 1. Upload ảnh
+                          String? imageUrl = await _uploadImage(evidenceImage!);
+
+                          if (imageUrl != null) {
+                            Navigator.pop(context); // Đóng dialog
+                            // 2. Gọi API thật với link ảnh vừa có
+                            if (isReceiving) {
+                              _callReceiveAPI(productId, imageUrl);
+                            } else {
+                              _callDeliveryAPI(productId, imageUrl);
+                            }
+                          } else {
+                            setDialogState(() => isUploading = false);
+                          }
+                        },
+                  child: isUploading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(),
+                        )
+                      : const Text("Xác nhận"),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }

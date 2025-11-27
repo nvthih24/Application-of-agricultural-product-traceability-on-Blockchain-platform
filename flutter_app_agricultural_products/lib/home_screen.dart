@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart'; // Nhớ import cái này
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-
 import 'qr_scanner_screen.dart';
 import 'farm_detail_screen.dart';
 import 'profile_screen.dart';

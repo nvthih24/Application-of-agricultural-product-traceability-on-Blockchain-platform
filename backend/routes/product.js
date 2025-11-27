@@ -56,6 +56,8 @@ router.get("/my-products", jwtAuth, async (req, res) => {
                 : "Chờ duyệt gieo trồng",
             statusCode: harvestDate > 0 ? 2 : plantingStatus === 1 ? 1 : 0,
             plantingStatus: plantingStatus,
+            harvestStatus: toNumber(trace.harvestStatus),
+            harvestDate: toNumber(trace.harvestDate),
           });
         }
       } catch (e) {
@@ -147,6 +149,58 @@ router.get("/pending-requests", jwtAuth, async (req, res) => {
     console.error("Lỗi lấy pending list:", error);
     res.status(500).json({ error: "Lỗi server" });
   }
+});
+
+// API: Lấy lịch sử kiểm duyệt (Đã duyệt / Từ chối)
+router.get('/moderated-requests', jwtAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    if (!user || user.role !== 'moderator') return res.status(403).json({ error: "Cấm" });
+
+    const historyPlanting = [];
+    const historyHarvest = [];
+    const nextId = await readContract.nextProductId();
+
+    for (let i = 1; i < nextId; i++) {
+      try {
+        const pid = await readContract.indexToProductId(i);
+        if (!pid) continue;
+        const trace = await readContract.getTrace(pid);
+        
+        const pStatus = toNumber(trace.plantingStatus); // 1: Approved, 2: Rejected
+        const hStatus = toNumber(trace.harvestStatus);
+
+        const item = {
+          id: pid,
+          name: trace.productName,
+          farm: trace.farmName,
+          image: trace.plantingImageUrl || "",
+          date: toNumber(trace.plantingDate),
+          status: "Unknown"
+        };
+
+        // Lọc danh sách Gieo trồng đã xử lý (Khác 0)
+        if (pStatus !== 0) {
+            let statusText = pStatus === 1 ? "Đã duyệt" : "Từ chối";
+            historyPlanting.push({ ...item, status: statusText, statusCode: pStatus });
+        }
+
+        // Lọc danh sách Thu hoạch đã xử lý (Khác 0)
+        if (hStatus !== 0) {
+            let statusText = hStatus === 1 ? "Đã duyệt" : "Từ chối";
+            historyHarvest.push({ 
+                ...item, 
+                status: statusText, 
+                statusCode: hStatus,
+                image: trace.harvestImageUrl || item.image,
+                type: 'harvest' 
+            });
+        }
+      } catch (e) {}
+    }
+
+    res.json({ success: true, data: { planting: historyPlanting, harvest: historyHarvest } });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // API: Lấy danh sách hàng hóa của Tài xế (Đang chở hoặc Đã giao)

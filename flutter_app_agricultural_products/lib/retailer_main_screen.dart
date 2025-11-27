@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'login_screen.dart';
 import 'qr_scanner_screen.dart';
-import 'package:image_picker/image_picker.dart'; // Nhớ import để chụp ảnh kệ
-// import 'package:mime/mime.dart'; // Cần thêm logic upload ảnh nếu muốn full
-import 'home_screen.dart';
+import 'profile_screen.dart'; // Tab Tài khoản
 
 const Color kRetailerColor = Colors.indigo;
 
@@ -17,120 +16,136 @@ class RetailerMainScreen extends StatefulWidget {
 }
 
 class _RetailerMainScreenState extends State<RetailerMainScreen> {
-  // Danh sách sản phẩm ĐANG QUẢN LÝ (Lưu tạm trên máy hoặc gọi API nếu có)
-  // Demo: Sẽ load các sản phẩm vừa quét được
-  List<Map<String, dynamic>> myInventory = [];
-  bool _isLoading = false;
+  int _selectedIndex = 0;
 
-  void _showLogoutDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text("Đăng xuất"),
-          content: const Text(
-            "Bạn có chắc chắn muốn đăng xuất khỏi tài khoản không?",
+  static final List<Widget> _pages = [
+    const RetailerDashboardTab(), // Tab 0: Quản lý kho
+    const Center(child: Text("Thống kê (Đang phát triển)")), // Tab 1
+    const ProfileScreen(), // Tab 2
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: _pages[_selectedIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.store), label: 'Cửa hàng'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.bar_chart),
+            label: 'Thống kê',
           ),
-          actions: [
-            // Nút 1: Quay lại (Hủy)
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context); // Đóng hộp thoại, không làm gì cả
-              },
-              child: const Text(
-                "Quay lại",
-                style: TextStyle(color: Colors.grey),
-              ),
-            ),
-
-            // Nút 2: Đăng xuất (Thực hiện)
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red, // Màu đỏ cảnh báo
-              ),
-              onPressed: () {
-                Navigator.pop(context); // Đóng hộp thoại trước
-                _logout(); // Gọi hàm đăng xuất thật
-              },
-              child: const Text(
-                "Đăng xuất",
-                style: TextStyle(color: Colors.white),
-              ),
-            ),
-          ],
-        );
-      },
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Tài khoản'),
+        ],
+        currentIndex: _selectedIndex,
+        selectedItemColor: kRetailerColor,
+        unselectedItemColor: Colors.grey,
+        onTap: (index) => setState(() => _selectedIndex = index),
+        type: BottomNavigationBarType.fixed,
+      ),
     );
   }
+}
 
-  Future<void> _logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear(); // Xóa token đăng nhập
+// ==========================================
+// TAB QUẢN LÝ KHO (DASHBOARD)
+// ==========================================
+class RetailerDashboardTab extends StatefulWidget {
+  const RetailerDashboardTab({super.key});
 
-    if (mounted) {
-      // Xóa sạch lịch sử, quay về trang Home
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
-        (route) => false,
-      );
-    }
+  @override
+  State<RetailerDashboardTab> createState() => _RetailerDashboardTabState();
+}
+
+class _RetailerDashboardTabState extends State<RetailerDashboardTab> {
+  List<Map<String, dynamic>> myInventory = [];
+  bool _isLoading = false; // Ban đầu không load vì chưa có API lấy list riêng
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInventoryFromLocal(); // <--- THÊM DÒNG NÀY
   }
 
   // 1. HÀM QUÉT MÃ NHẬP KHO
   Future<void> _scanToImport() async {
-    // Mở màn hình quét QR, chờ kết quả trả về là mã ProductID
-    /* LƯU Ý: Ông cần sửa lại qr_scanner_screen.dart một chút để nó support trả về dữ liệu 
-       thay vì tự push sang trang Trace.
-       Hoặc đơn giản là copy file qr_scanner cũ, đổi tên thành qr_picker.dart để dùng cho việc này.
-       Ở đây tôi giả định hàm Navigator.push trả về String code.
-    */
-    // Tạm thời dùng code cứng để test luồng trước nhé, sau ông gắn QR sau.
-    // String? code = await Navigator.push(...);
+    // Mở màn hình quét QR
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const QrScannerScreen(isReturnData: true),
+      ),
+    );
 
-    // Giả lập quét được mã:
-    String code = "BATCH-1763967012955-246"; // Thay bằng mã thật ông vừa tạo
-    _fetchProductInfoToAdd(code);
+    if (result != null && result.toString().isNotEmpty) {
+      _fetchProductInfoToAdd(result.toString());
+    }
   }
 
-  // Lấy thông tin sản phẩm từ Blockchain để hiện lên list
+  // Lấy thông tin sản phẩm từ Blockchain để thêm vào list tạm
   Future<void> _fetchProductInfoToAdd(String productId) async {
     setState(() => _isLoading = true);
     try {
       final response = await http.get(
         Uri.parse('http://10.0.2.2:5000/api/products/$productId'),
       );
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body)['data'];
 
-        // Kiểm tra xem đã có trong list chưa
+        // Kiểm tra trùng
         if (myInventory.any((e) => e['id'] == productId)) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text("Sản phẩm này đã có trong danh sách!"),
+              backgroundColor: Colors.orange,
             ),
           );
           setState(() => _isLoading = false);
           return;
         }
 
+        // Kiểm tra trạng thái (Phải giao xong mới được nhập)
+        int deliveryDate = data['dates']['delivery'] ?? 0;
+        int price = data['retailer']['price'] ?? 0;
+
+        int status = 2; // Mặc định: Mới nhận
+        String statusText = "Chờ lên kệ";
+
+        if (price > 0) {
+          status = 3;
+          statusText = "Đang bày bán";
+        }
+        // Nếu contract có trạng thái 'Sold' thì check thêm status=4
+
         setState(() {
-          myInventory.add({
+          myInventory.insert(0, {
+            // Thêm lên đầu
             "id": data['id'],
             "name": data['name'],
             "farm": data['farm']['name'],
-            "image": data['images']['planting'], // Lấy tạm ảnh planting
-            "price": data['retailer']['price'] > 0
-                ? "${data['retailer']['price']}"
-                : "",
-            "statusCode": data['dates']['delivery'] > 0
-                ? 3
-                : 2, // 2: Mới nhận, 3: Đã lên kệ
-            "status": data['dates']['delivery'] > 0
-                ? "Đang bày bán"
-                : "Chờ lên kệ",
+            "image": data['images']['planting'] ?? "",
+            "price": price > 0 ? "$price" : "",
+            "statusCode": status,
+            "status": statusText,
           });
           _isLoading = false;
         });
+        _saveInventoryToLocal(); // Lưu lại sau khi thêm
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Đã thêm vào danh sách nhập kho!"),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Không tìm thấy sản phẩm này"),
+            backgroundColor: Colors.red,
+          ),
+        );
+        setState(() => _isLoading = false);
       }
     } catch (e) {
       print(e);
@@ -138,16 +153,13 @@ class _RetailerMainScreenState extends State<RetailerMainScreen> {
     }
   }
 
-  // 2. HÀM CẬP NHẬT GIÁ & LÊN KỆ (GỌI TRANSACTION)
+  // 2. HÀM LÊN KỆ (GỌI API UPDATE)
   Future<void> _updateShelf(Map<String, dynamic> item, String price) async {
     setState(() => _isLoading = true);
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
 
     try {
-      // Ở đây thiếu bước upload ảnh kệ hàng, ông có thể copy logic từ add_crop_screen qua
-      // Tạm thời gửi ảnh rỗng hoặc ảnh cũ
-
       final response = await http.post(
         Uri.parse('http://10.0.2.2:5000/api/auth/transactions'),
         headers: {
@@ -156,10 +168,11 @@ class _RetailerMainScreenState extends State<RetailerMainScreen> {
         },
         body: jsonEncode({
           "action": "updateManagerInfo",
-          "productId": item['id'].toString().trim(),
+          "productId": item['id'],
           "managerReceiveDate": (DateTime.now().millisecondsSinceEpoch / 1000)
               .floor(),
-          "managerReceiveImageUrl": "", // TODO: Thêm logic upload ảnh
+          "managerReceiveImageUrl":
+              "", // (Tạm thời để rỗng hoặc thêm chụp ảnh sau)
           "price": int.parse(price),
         }),
       );
@@ -171,6 +184,7 @@ class _RetailerMainScreenState extends State<RetailerMainScreen> {
           item['price'] = price;
           _isLoading = false;
         });
+        _saveInventoryToLocal(); // Lưu lại sau khi cập nhật
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("Lên kệ thành công!"),
@@ -178,24 +192,21 @@ class _RetailerMainScreenState extends State<RetailerMainScreen> {
           ),
         );
       } else {
-        // --- THÊM ĐOẠN NÀY VÀO ĐỂ TẮT QUAY KHI LỖI ---
-        setState(() => _isLoading = false);
-        // In lỗi ra để biết tại sao
-        print("Lỗi Backend: ${response.body}");
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Lỗi: ${response.body}"),
             backgroundColor: Colors.red,
           ),
         );
+        setState(() => _isLoading = false);
       }
     } catch (e) {
-      setState(() => _isLoading = false);
       print(e);
+      setState(() => _isLoading = false);
     }
   }
 
-  // 3. HÀM XÁC NHẬN BÁN (DEACTIVATE)
+  // 3. HÀM BÁN (SOLD)
   Future<void> _soldProduct(Map<String, dynamic> item) async {
     setState(() => _isLoading = true);
     final prefs = await SharedPreferences.getInstance();
@@ -209,7 +220,7 @@ class _RetailerMainScreenState extends State<RetailerMainScreen> {
           'Authorization': 'Bearer $token',
         },
         body: jsonEncode({
-          "action": "deactivateProduct",
+          "action": "deactivateProduct", // Action đánh dấu đã bán
           "productId": item['id'],
         }),
       );
@@ -220,19 +231,49 @@ class _RetailerMainScreenState extends State<RetailerMainScreen> {
           item['status'] = "Đã bán hết";
           _isLoading = false;
         });
+        _saveInventoryToLocal(); // Lưu lại sau khi cập nhật
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("Đã bán xong!"),
+            content: Text("Xác nhận bán thành công!"),
             backgroundColor: Colors.green,
           ),
         );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Lỗi: ${response.body}"),
+            backgroundColor: Colors.red,
+          ),
+        );
+        setState(() => _isLoading = false);
       }
     } catch (e) {
       setState(() => _isLoading = false);
     }
   }
 
-  // UI Dialog nhập giá
+  // Hàm lưu danh sách xuống máy
+  Future<void> _saveInventoryToLocal() async {
+    final prefs = await SharedPreferences.getInstance();
+    // Chuyển List<Map> thành chuỗi JSON để lưu
+    String jsonString = jsonEncode(myInventory);
+    await prefs.setString('retailer_inventory', jsonString);
+  }
+
+  // Hàm đọc danh sách từ máy lên (gọi ở initState)
+  Future<void> _loadInventoryFromLocal() async {
+    final prefs = await SharedPreferences.getInstance();
+    String? jsonString = prefs.getString('retailer_inventory');
+
+    if (jsonString != null) {
+      setState(() {
+        List<dynamic> decoded = jsonDecode(jsonString);
+        myInventory = List<Map<String, dynamic>>.from(decoded);
+      });
+    }
+  }
+
+  // UI DIALOG NHẬP GIÁ
   void _showUpdateShelfInfo(BuildContext context, Map<String, dynamic> item) {
     final priceController = TextEditingController();
     showDialog(
@@ -243,8 +284,9 @@ class _RetailerMainScreenState extends State<RetailerMainScreen> {
           controller: priceController,
           keyboardType: TextInputType.number,
           decoration: const InputDecoration(
-            labelText: "Giá bán (VNĐ)",
+            labelText: "Giá bán lẻ (VNĐ)",
             suffixText: "đ",
+            border: OutlineInputBorder(),
           ),
         ),
         actions: [
@@ -260,10 +302,32 @@ class _RetailerMainScreenState extends State<RetailerMainScreen> {
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: kRetailerColor),
-            child: const Text(
-              "Xác nhận",
-              style: TextStyle(color: Colors.white),
-            ),
+            child: const Text("Lên Kệ", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // UI DIALOG XÁC NHẬN BÁN
+  void _showSellDialog(BuildContext context, Map<String, dynamic> item) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Xác nhận bán hàng"),
+        content: Text("Bạn xác nhận lô hàng ${item['name']} đã bán hết?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Hủy"),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _soldProduct(item);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            child: const Text("Đã Bán", style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -275,31 +339,58 @@ class _RetailerMainScreenState extends State<RetailerMainScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: kRetailerColor,
-        title: const Text(
-          "Quản Lý Siêu Thị",
-          style: TextStyle(color: Colors.white),
+        automaticallyImplyLeading: false,
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Quản Lý Siêu Thị",
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(
+              "WinMart - Chi nhánh 1",
+              style: TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+          ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: _showLogoutDialog,
-          ),
-        ],
       ),
+
+      // NÚT QUÉT
       floatingActionButton: FloatingActionButton.extended(
-        // Tạm thời gọi hàm giả lập quét mã để test
         onPressed: _scanToImport,
         backgroundColor: kRetailerColor,
-        icon: const Icon(Icons.qr_code_2, color: Colors.white),
+        icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
         label: const Text(
           "Quét Nhập Kho",
           style: TextStyle(color: Colors.white),
         ),
       ),
+
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : myInventory.isEmpty
-          ? const Center(child: Text("Kho trống. Hãy quét mã để nhập hàng."))
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.store_mall_directory_outlined,
+                    size: 80,
+                    color: Colors.grey[300],
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    "Kho trống\nHãy quét mã QR để nhập hàng mới",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ],
+              ),
+            )
           : ListView.builder(
               padding: const EdgeInsets.all(15),
               itemCount: myInventory.length,
@@ -309,53 +400,125 @@ class _RetailerMainScreenState extends State<RetailerMainScreen> {
     );
   }
 
-  // Widget Card (Giữ nguyên logic UI hôm qua, chỉ đổi data)
   Widget _buildProductCard(Map<String, dynamic> item) {
-    // ... (Copy lại đoạn build Card hôm qua vào đây, thay các biến item['...'] tương ứng)
-    // Nếu ông lười thì bảo tôi, tôi paste nốt đoạn này cho.
-    // Nhưng cơ bản là giống hệt file hôm qua.
+    int status = item['statusCode'];
+    Color statusColor = status == 2
+        ? Colors.orange
+        : (status == 3 ? Colors.green : Colors.grey);
+
     return Card(
       margin: const EdgeInsets.only(bottom: 15),
-      child: ListTile(
-        leading: Image.network(
-          item['image'],
-          width: 50,
-          height: 50,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => const Icon(Icons.image),
-        ),
-        title: Text(
-          item['name'],
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 3,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
           children: [
-            Text("ID: ${item['id']}", style: const TextStyle(fontSize: 10)),
-            Text(
-              "Trạng thái: ${item['status']}",
-              style: TextStyle(
-                color: item['statusCode'] == 3 ? Colors.green : Colors.orange,
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  item['image'],
+                  width: 60,
+                  height: 60,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    width: 60,
+                    height: 60,
+                    color: Colors.grey[200],
+                    child: const Icon(Icons.image),
+                  ),
+                ),
               ),
-            ),
-            if (item['price'] != "")
-              Text(
-                "Giá: ${item['price']} đ",
+              title: Text(
+                item['name'],
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "ID: ${item['id']}",
+                    style: const TextStyle(fontSize: 10, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: statusColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          item['status'],
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: statusColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      if (item['price'] != "") ...[
+                        const SizedBox(width: 10),
+                        Text(
+                          "${item['price']} đ",
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            // NÚT HÀNH ĐỘNG
+            if (status == 2) ...[
+              // Mới nhập -> Cần lên kệ
+              const Divider(),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _showUpdateShelfInfo(context, item),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kRetailerColor,
+                  ),
+                  icon: const Icon(
+                    Icons.price_change,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                  label: const Text(
+                    "Cập nhật Giá & Lên Kệ",
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ),
+            ] else if (status == 3) ...[
+              // Đang bán -> Bán xong
+              const Divider(),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _showSellDialog(context, item),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.green,
+                    side: const BorderSide(color: Colors.green),
+                  ),
+                  icon: const Icon(Icons.check_circle, size: 18),
+                  label: const Text("Xác nhận Đã Bán Hết"),
+                ),
+              ),
+            ],
           ],
         ),
-        trailing: item['statusCode'] == 2
-            ? IconButton(
-                icon: const Icon(Icons.edit, color: Colors.blue),
-                onPressed: () => _showUpdateShelfInfo(context, item),
-              )
-            : item['statusCode'] == 3
-            ? IconButton(
-                icon: const Icon(Icons.check_circle, color: Colors.green),
-                onPressed: () => _soldProduct(item),
-              )
-            : const Icon(Icons.lock, color: Colors.grey),
       ),
     );
   }

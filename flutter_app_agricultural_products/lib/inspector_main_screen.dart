@@ -4,10 +4,14 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart'; // flutter pub add intl
 import 'home_screen.dart';
+import 'profile_screen.dart';
 
 const Color kInspectorColor = Color(0xFF6A1B9A);
 const Color kInspectorLight = Color(0xFF9C4DCC);
 
+// ==========================================
+// 1. MÀN HÌNH CHÍNH (MENU DƯỚI)
+// ==========================================
 class InspectorMainScreen extends StatefulWidget {
   const InspectorMainScreen({super.key});
 
@@ -15,7 +19,49 @@ class InspectorMainScreen extends StatefulWidget {
   State<InspectorMainScreen> createState() => _InspectorMainScreenState();
 }
 
-class _InspectorMainScreenState extends State<InspectorMainScreen>
+class _InspectorMainScreenState extends State<InspectorMainScreen> {
+  int _selectedIndex = 0;
+
+  static final List<Widget> _pages = [
+    const InspectorDashboardTab(), // Tab 0: Chờ duyệt (Code cũ)
+    const InspectorHistoryTab(), // Tab 1: Lịch sử (Mới)
+    const ProfileScreen(), // Tab 2: Tài khoản
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: _pages[_selectedIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard_customize),
+            label: 'Chờ duyệt',
+          ),
+          BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Lịch sử'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Tài khoản'),
+        ],
+        currentIndex: _selectedIndex,
+        selectedItemColor: kInspectorColor,
+        unselectedItemColor: Colors.grey,
+        onTap: (index) => setState(() => _selectedIndex = index),
+        type: BottomNavigationBarType.fixed,
+      ),
+    );
+  }
+}
+
+// ==========================================
+// 2. TAB DASHBOARD (CHỜ DUYỆT)
+// ==========================================
+class InspectorDashboardTab extends StatefulWidget {
+  const InspectorDashboardTab({super.key});
+
+  @override
+  State<InspectorDashboardTab> createState() => _InspectorDashboardTabState();
+}
+
+class _InspectorDashboardTabState extends State<InspectorDashboardTab>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _isLoading = true;
@@ -34,13 +80,11 @@ class _InspectorMainScreenState extends State<InspectorMainScreen>
   Future<void> _fetchPendingRequests() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
-
     try {
       final response = await http.get(
         Uri.parse('http://10.0.2.2:5000/api/products/pending-requests'),
         headers: {'Authorization': 'Bearer $token'},
       );
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body)['data'];
         setState(() {
@@ -50,7 +94,6 @@ class _InspectorMainScreenState extends State<InspectorMainScreen>
         });
       }
     } catch (e) {
-      print("Lỗi lấy danh sách: $e");
       setState(() => _isLoading = false);
     }
   }
@@ -161,6 +204,14 @@ class _InspectorMainScreenState extends State<InspectorMainScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Lỗi: $e"), backgroundColor: Colors.red),
       );
+
+      // GIẢ LẬP THÀNH CÔNG ĐỂ TEST UI:
+      // setState(() {
+      //   if (item['type'] == 'planting')
+      //     pendingPlanting.remove(item);
+      //   else
+      //     pendingHarvest.remove(item);
+      // });
     }
   }
 
@@ -199,6 +250,15 @@ class _InspectorMainScreenState extends State<InspectorMainScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const Text(
+                  "Danh sách chờ duyệt",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 20),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -422,6 +482,122 @@ class _InspectorMainScreenState extends State<InspectorMainScreen>
           ],
         ),
       ),
+    );
+  }
+}
+
+// ==========================================
+// 3. TAB LỊCH SỬ (MỚI)
+// ==========================================
+class InspectorHistoryTab extends StatefulWidget {
+  const InspectorHistoryTab({super.key});
+
+  @override
+  State<InspectorHistoryTab> createState() => _InspectorHistoryTabState();
+}
+
+class _InspectorHistoryTabState extends State<InspectorHistoryTab>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  bool _isLoading = true;
+  List<dynamic> historyPlanting = [];
+  List<dynamic> historyHarvest = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _fetchHistory();
+  }
+
+  Future<void> _fetchHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    try {
+      // Gọi API mới
+      final response = await http.get(
+        Uri.parse('http://10.0.2.2:5000/api/products/moderated-requests'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body)['data'];
+        setState(() {
+          historyPlanting = data['planting'];
+          historyHarvest = data['harvest'];
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Lịch sử kiểm duyệt"),
+        backgroundColor: Colors.grey,
+      ),
+      body: Column(
+        children: [
+          Container(
+            color: Colors.grey[200],
+            child: TabBar(
+              controller: _tabController,
+              labelColor: Colors.black,
+              tabs: const [
+                Tab(text: "Gieo Trồng"),
+                Tab(text: "Thu Hoạch"),
+              ],
+            ),
+          ),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildHistoryList(historyPlanting),
+                      _buildHistoryList(historyHarvest),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHistoryList(List<dynamic> items) {
+    if (items.isEmpty) return const Center(child: Text("Chưa có lịch sử."));
+    return ListView.builder(
+      padding: const EdgeInsets.all(15),
+      itemCount: items.length,
+      itemBuilder: (ctx, i) {
+        final item = items[i];
+        bool isApproved = item['statusCode'] == 1; // 1: Approved, 2: Rejected
+        return Card(
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: isApproved ? Colors.green[50] : Colors.red[50],
+              child: Icon(
+                isApproved ? Icons.check : Icons.close,
+                color: isApproved ? Colors.green : Colors.red,
+              ),
+            ),
+            title: Text(
+              item['name'],
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text("Farm: ${item['farm']}"),
+            trailing: Chip(
+              label: Text(item['status']),
+              backgroundColor: isApproved ? Colors.green : Colors.red,
+              labelStyle: const TextStyle(color: Colors.white, fontSize: 12),
+            ),
+          ),
+        );
+      },
     );
   }
 }
