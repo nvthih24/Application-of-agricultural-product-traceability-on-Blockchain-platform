@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'login_screen.dart';
 import 'qr_scanner_screen.dart';
-import 'profile_screen.dart'; // Tab Tài khoản
+import 'profile_screen.dart';
 
 const Color kRetailerColor = Colors.indigo;
 
@@ -64,7 +63,7 @@ class _RetailerDashboardTabState extends State<RetailerDashboardTab> {
   @override
   void initState() {
     super.initState();
-    _loadInventoryFromLocal(); // <--- THÊM DÒNG NÀY
+    _fetchInventoryFromAPI();
   }
 
   // 1. HÀM QUÉT MÃ NHẬP KHO
@@ -128,10 +127,11 @@ class _RetailerDashboardTabState extends State<RetailerDashboardTab> {
             "price": price > 0 ? "$price" : "",
             "statusCode": status,
             "status": statusText,
+            "time": deliveryDate,
           });
           _isLoading = false;
         });
-        _saveInventoryToLocal(); // Lưu lại sau khi thêm
+        _fetchInventoryFromAPI(); // Lưu lại sau khi thêm
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("Đã thêm vào danh sách nhập kho!"),
@@ -184,7 +184,7 @@ class _RetailerDashboardTabState extends State<RetailerDashboardTab> {
           item['price'] = price;
           _isLoading = false;
         });
-        _saveInventoryToLocal(); // Lưu lại sau khi cập nhật
+        _fetchInventoryFromAPI(); // Lưu lại sau khi cập nhật
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("Lên kệ thành công!"),
@@ -231,7 +231,7 @@ class _RetailerDashboardTabState extends State<RetailerDashboardTab> {
           item['status'] = "Đã bán hết";
           _isLoading = false;
         });
-        _saveInventoryToLocal(); // Lưu lại sau khi cập nhật
+        _fetchInventoryFromAPI(); // Lưu lại sau khi cập nhật
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("Xác nhận bán thành công!"),
@@ -252,24 +252,28 @@ class _RetailerDashboardTabState extends State<RetailerDashboardTab> {
     }
   }
 
-  // Hàm lưu danh sách xuống máy
-  Future<void> _saveInventoryToLocal() async {
+  Future<void> _fetchInventoryFromAPI() async {
+    setState(() => _isLoading = true);
     final prefs = await SharedPreferences.getInstance();
-    // Chuyển List<Map> thành chuỗi JSON để lưu
-    String jsonString = jsonEncode(myInventory);
-    await prefs.setString('retailer_inventory', jsonString);
-  }
+    final token = prefs.getString('token');
 
-  // Hàm đọc danh sách từ máy lên (gọi ở initState)
-  Future<void> _loadInventoryFromLocal() async {
-    final prefs = await SharedPreferences.getInstance();
-    String? jsonString = prefs.getString('retailer_inventory');
+    try {
+      final response = await http.get(
+        Uri.parse('http://10.0.2.2:5000/api/products/retailer-products'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
 
-    if (jsonString != null) {
-      setState(() {
-        List<dynamic> decoded = jsonDecode(jsonString);
-        myInventory = List<Map<String, dynamic>>.from(decoded);
-      });
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          myInventory = List<Map<String, dynamic>>.from(data['data']);
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
     }
   }
 
@@ -400,12 +404,21 @@ class _RetailerDashboardTabState extends State<RetailerDashboardTab> {
     );
   }
 
+  String _formatDate(int timestamp) {
+    if (timestamp == 0) return "N/A";
+    final date = DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);
+    return "${date.hour}:${date.minute} - ${date.day}/${date.month}/${date.year}";
+  }
+
   Widget _buildProductCard(Map<String, dynamic> item) {
     int status = item['statusCode'];
     Color statusColor = status == 2
         ? Colors.orange
         : (status == 3 ? Colors.green : Colors.grey);
-
+    int time = item['time'] ?? 0;
+    String arrivalTime = item['time'] != null
+        ? _formatDate(item['time'])
+        : "Vừa tới";
     return Card(
       margin: const EdgeInsets.only(bottom: 15),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -442,6 +455,24 @@ class _RetailerDashboardTabState extends State<RetailerDashboardTab> {
                     "ID: ${item['id']}",
                     style: const TextStyle(fontSize: 10, color: Colors.grey),
                   ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.access_time,
+                        size: 12,
+                        color: Colors.blueGrey,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        "Đã đến: $arrivalTime",
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.blueGrey,
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
@@ -475,6 +506,7 @@ class _RetailerDashboardTabState extends State<RetailerDashboardTab> {
                       ],
                     ],
                   ),
+                  const SizedBox(height: 4),
                 ],
               ),
             ),
