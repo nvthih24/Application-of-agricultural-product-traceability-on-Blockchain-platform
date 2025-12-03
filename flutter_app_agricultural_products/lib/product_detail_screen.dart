@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'widgets/traceability_timeline.dart';
 
 const Color kPrimaryColor = Color(0xFF00C853);
 
@@ -199,7 +198,6 @@ class ProductDetailScreen extends StatelessWidget {
                   controller:
                       controller, // Quan trọng để cuộn được trong BottomSheet
                   children: [
-                    TraceabilityTimeline(), // Widget timeline chúng ta vừa tạo
                     const SizedBox(height: 20),
                     // Nút xem trên Explorer (Etherscan)
                     OutlinedButton.icon(
