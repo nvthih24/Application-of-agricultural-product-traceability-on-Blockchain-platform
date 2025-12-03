@@ -7,7 +7,7 @@ const jwtAuth = require("../middleware/auth"); // Đổi tên biến cho thống
 const router = express.Router();
 
 // ==========================================
-// 1. ĐĂNG KÝ (REGISTER)
+// ĐĂNG KÝ (REGISTER)
 // ==========================================
 router.post("/register", async (req, res) => {
   const { fullName, phone, email, address, password, confirmPassword, role } =
@@ -58,7 +58,7 @@ router.post("/register", async (req, res) => {
 });
 
 // ====================
-// 2. ĐĂNG NHẬP (LOGIN)
+// ĐĂNG NHẬP (LOGIN)
 // ====================
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
@@ -96,7 +96,7 @@ router.post("/login", async (req, res) => {
 });
 
 // ====================================
-// 3. LẤY THÔNG TIN USER (CURRENT USER)
+// LẤY THÔNG TIN USER (CURRENT USER)
 // ====================================
 router.get("/me", jwtAuth, async (req, res) => {
   try {
@@ -108,7 +108,7 @@ router.get("/me", jwtAuth, async (req, res) => {
 });
 
 // ==========================================
-// 4. LẤY DANH SÁCH NÔNG DÂN (Cho Trang Chủ Consumer)
+// LẤY DANH SÁCH NÔNG DÂN (Cho Trang Chủ Consumer)
 // ==========================================
 router.get("/farmers", async (req, res) => {
   try {
@@ -122,7 +122,7 @@ router.get("/farmers", async (req, res) => {
 });
 
 // ==========================================
-// 5. CẬP NHẬT VÍ BLOCKCHAIN (Cho Profile)
+// CẬP NHẬT VÍ BLOCKCHAIN (Cho Profile)
 // ==========================================
 router.post("/update-wallet", jwtAuth, async (req, res) => {
   try {
@@ -150,7 +150,7 @@ router.post("/update-wallet", jwtAuth, async (req, res) => {
 });
 
 // ==========================================
-// 6. CẬP NHẬT THÔNG TIN CÁ NHÂN (Cho Transporter nhập Công Ty)
+// CẬP NHẬT THÔNG TIN CÁ NHÂN (Cho Transporter nhập Công Ty)
 // ==========================================
 router.post("/update-profile", jwtAuth, async (req, res) => {
   try {
