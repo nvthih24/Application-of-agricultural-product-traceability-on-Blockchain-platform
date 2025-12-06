@@ -9,6 +9,7 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:mime/mime.dart';
 import 'package:http_parser/http_parser.dart';
+import 'notification_screen.dart';
 
 // Màu chủ đạo: Xanh dương đậm (Logistics) + Gradient
 const Color kTransporterDark = Color(0xFF0D47A1);
@@ -27,7 +28,7 @@ class _TransporterMainScreenState extends State<TransporterMainScreen> {
 
   static final List<Widget> _pages = [
     const TransporterDashboardTab(),
-    const Center(child: Text("Thông báo (Đang phát triển)")),
+    const NotificationScreen(),
     const ProfileScreen(),
   ];
 

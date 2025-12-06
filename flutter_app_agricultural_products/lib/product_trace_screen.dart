@@ -335,6 +335,7 @@ class _ProductTraceScreenState extends State<ProductTraceScreen> {
                     icon: Icons.storefront,
                     color: Colors.purple,
                     isLast: true,
+                    isActive: true,
                     content: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -342,36 +343,56 @@ class _ProductTraceScreenState extends State<ProductTraceScreen> {
                           "Sản phẩm đã được kiểm định và lên kệ.",
                           style: TextStyle(color: Colors.grey),
                         ),
-                        const SizedBox(height: 5),
-                        // THÔNG TIN QUAN TRỌNG: Giá bán
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.price_check,
-                              size: 16,
-                              color: Colors.green,
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              "${retailer['price']} đ",
-                              style: const TextStyle(
-                                fontSize: 18,
-                                color: Colors.red,
-                                fontWeight: FontWeight.bold,
+                        const SizedBox(height: 8),
+
+                        // 1. HIỂN THỊ GIÁ BÁN
+                        if (retailer['price'] > 0)
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.price_check,
+                                size: 18,
+                                color: Colors.green,
                               ),
-                            ),
-                          ],
-                        ),
+                              const SizedBox(width: 5),
+                              Text(
+                                "${retailer['price']} VNĐ",
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+
                         const SizedBox(height: 10),
+
+                        // 2. HIỂN THỊ ẢNH QUẦY KỆ (MỚI THÊM) 🔥
+                        if (retailer['image'] != null &&
+                            retailer['image'].toString().isNotEmpty) ...[
+                          _buildEvidenceImage(
+                            "Ảnh trưng bày thực tế",
+                            retailer['image'],
+                          ),
+                          const SizedBox(height: 15),
+                        ],
+
+                        // 3. Nút Blockchain
                         SizedBox(
                           width: double.infinity,
                           child: OutlinedButton.icon(
                             onPressed: () {
-                              // Mở link blockchain (Optional)
-                              launchUrl(Uri.parse("https://zeroscan.org"));
+                              launchUrl(
+                                Uri.parse("https://zeroscan.org"),
+                              ); // Link demo
                             },
                             icon: const Icon(Icons.open_in_new, size: 16),
                             label: const Text("Xác thực trên Blockchain"),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.purple,
+                              side: const BorderSide(color: Colors.purple),
+                            ),
                           ),
                         ),
                       ],
@@ -584,7 +605,49 @@ class _ProductTraceScreenState extends State<ProductTraceScreen> {
   }
 
   // Widget hiển thị ảnh bằng chứng nhỏ có chú thích
-  Widget _buildEvidenceImage(String label, String url) {
+  Widget _buildEvidenceImage(String label, String? url) {
+    // 1. NẾU KHÔNG CÓ ẢNH (Đơn hàng cũ) -> Hiện Placeholder
+    if (url == null || url.isEmpty || url == "null") {
+      return Column(
+        children: [
+          Container(
+            height: 80,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.grey[200], // Nền xám
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: const Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.image_not_supported_outlined,
+                  color: Colors.grey,
+                  size: 24,
+                ),
+                SizedBox(height: 4),
+                Text(
+                  "Chưa có ảnh",
+                  style: TextStyle(fontSize: 10, color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: Colors.grey,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
+      );
+    }
+
+    // 2. NẾU CÓ ẢNH (Đơn hàng mới) -> Hiện ảnh bình thường
     return Column(
       children: [
         ClipRRect(
@@ -594,46 +657,12 @@ class _ProductTraceScreenState extends State<ProductTraceScreen> {
             height: 80,
             width: double.infinity,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
+            // Nếu link ảnh bị chết (404) thì cũng hiện icon lỗi
+            errorBuilder: (c, e, s) => Container(
               height: 80,
+              width: double.infinity,
               color: Colors.grey[200],
-              child: const Icon(Icons.broken_image),
-            ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            color: Colors.grey,
-            fontStyle: FontStyle.italic,
-          ),
-        ),
-      ],
-    );
-  }
-
-  // Widget hiển thị khi KHÔNG có ảnh
-  Widget _buildNoImage(String label) {
-    return Column(
-      children: [
-        Container(
-          height: 80,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: Colors.grey[100],
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: Colors.grey.shade300,
-              style: BorderStyle.solid,
-            ),
-          ),
-          child: const Center(
-            child: Icon(
-              Icons.image_not_supported,
-              color: Colors.grey,
-              size: 30,
+              child: const Icon(Icons.broken_image, color: Colors.grey),
             ),
           ),
         ),

@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'qr_scanner_screen.dart';
 import 'farm_detail_screen.dart';
 import 'profile_screen.dart';
+import 'product_trace_screen.dart';
 
 const Color kPrimaryColor = Color(0xFF00C853);
 const Color kBackgroundColor = Color(0xFFF5F5F5);
@@ -75,6 +76,7 @@ class _HomeContentState extends State<HomeContent> {
   List<dynamic> _allFarms = []; // Danh sách gốc
   List<dynamic> _filteredFarms = []; // Danh sách hiển thị
   bool _isLoading = true;
+  List<dynamic> _newArrivals = [];
 
   String _searchKeyword = "";
   String _selectedCategory = "Tất cả"; // Filter mặc định
@@ -89,24 +91,34 @@ class _HomeContentState extends State<HomeContent> {
   @override
   void initState() {
     super.initState();
-    _fetchFarms();
+    _fetchData(); // Gọi cả 2 API
   }
 
-  Future<void> _fetchFarms() async {
+  Future<void> _fetchData() async {
     try {
-      final response = await http.get(
+      // 1. Lấy danh sách Nông trại
+      final resFarms = await http.get(
         Uri.parse('http://10.0.2.2:5000/api/auth/farmers'),
       );
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+      if (resFarms.statusCode == 200) {
+        final data = jsonDecode(resFarms.body);
         setState(() {
           _allFarms = data['data'];
-          _filteredFarms = _allFarms; // Ban đầu hiển thị hết
-          _isLoading = false;
+          _filteredFarms = _allFarms;
         });
-      } else {
-        setState(() => _isLoading = false);
       }
+
+      // 2. Lấy danh sách Sản phẩm mới lên kệ
+      final resProducts = await http.get(
+        Uri.parse('http://10.0.2.2:5000/api/products/on-shelf'),
+      );
+      if (resProducts.statusCode == 200) {
+        setState(() {
+          _newArrivals = jsonDecode(resProducts.body)['data'];
+        });
+      }
+
+      setState(() => _isLoading = false);
     } catch (e) {
       print("Lỗi: $e");
       setState(() => _isLoading = false);
@@ -132,7 +144,9 @@ class _HomeContentState extends State<HomeContent> {
     if (_selectedCategory != "Tất cả") {
       // Ví dụ: Nếu chọn "Rau củ", lọc những ông có tên chứa chữ "Rau" hoặc "Farm"
       // (Đây là logic tạm để demo hiệu ứng lọc)
-      // results = results.where((farm) => farm['fullName'].toString().contains("Farm")).toList();
+      results = results
+          .where((farm) => farm['fullName'].toString().contains("Farm"))
+          .toList();
     }
 
     setState(() {
@@ -328,8 +342,36 @@ class _HomeContentState extends State<HomeContent> {
 
             const SizedBox(height: 20),
 
+            if (_newArrivals.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 5,
+                ),
+                child: const Text(
+                  "🔥 Mới lên kệ",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red,
+                  ),
+                ),
+              ),
+              SizedBox(
+                height: 190,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: _newArrivals.length,
+                  itemBuilder: (context, index) =>
+                      _buildNewProductCard(_newArrivals[index]),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+
             // 4. DANH SÁCH NÔNG TRẠI (REAL DATA)
-            _buildSectionTitle("Nông trại tiêu biểu", () {}),
+            _buildSectionTitle("🔥 Nông trại tiêu biểu", () {}),
 
             _isLoading
                 ? const Center(
@@ -372,7 +414,10 @@ class _HomeContentState extends State<HomeContent> {
               color: kPrimaryColor,
             ),
           ),
-          // GestureDetector(onTap: onPress, child: const Text("Xem thêm", style: TextStyle(color: Colors.grey))),
+          GestureDetector(
+            onTap: onPress,
+            child: const Text("Xem thêm", style: TextStyle(color: Colors.grey)),
+          ),
         ],
       ),
     );
@@ -456,30 +501,34 @@ class _HomeContentState extends State<HomeContent> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(20),
-              ),
-              child:
-                  (farm['avatar'] != null &&
-                      farm['avatar'].toString().isNotEmpty)
-                  ? Image.network(
-                      farm['avatar'],
-                      height: 150,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Image.asset(
-                        'assets/images/farm_1.jpg',
-                        fit: BoxFit.cover,
+            Hero(
+              tag:
+                  "farm_img_${farm['_id'] ?? farm['phone']}", // Tag phải khớp với trang chi tiết
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(20),
+                ),
+                child:
+                    (farm['avatar'] != null &&
+                        farm['avatar'].toString().isNotEmpty)
+                    ? Image.network(
+                        farm['avatar'],
                         height: 150,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Image.asset(
+                          'assets/images/farm_1.jpg',
+                          fit: BoxFit.cover,
+                          height: 150,
+                        ),
+                      )
+                    : Image.asset(
+                        'assets/images/farm_1.jpg',
+                        height: 150,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
                       ),
-                    )
-                  : Image.asset(
-                      'assets/images/farm_1.jpg',
-                      height: 150,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                    ),
+              ),
             ),
             Padding(
               padding: const EdgeInsets.all(15),
@@ -516,6 +565,78 @@ class _HomeContentState extends State<HomeContent> {
                         ),
                       ),
                     ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Widget Card Sản Phẩm Mới (Ngang)
+  Widget _buildNewProductCard(dynamic item) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ProductTraceScreen(productId: item['id']),
+        ),
+      ),
+      child: Container(
+        width: 140,
+        margin: const EdgeInsets.only(right: 15, bottom: 5),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+            BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 5),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Ảnh sản phẩm (Có Hero Animation cho xịn)
+            Hero(
+              tag: "product_img_${item['id']}", // Tag duy nhất
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(15),
+                ),
+                child: Image.network(
+                  item['image'],
+                  height: 100,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) =>
+                      Container(height: 100, color: Colors.grey[200]),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item['name'],
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    item['farm'] ?? "",
+                    style: const TextStyle(fontSize: 10, color: Colors.grey),
+                    maxLines: 1,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "${item['price']} đ",
+                    style: const TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),

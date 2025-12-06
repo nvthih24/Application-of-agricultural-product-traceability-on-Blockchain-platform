@@ -1,8 +1,8 @@
-// backend/routes/auth.js
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
-const jwtAuth = require("../middleware/auth"); // Đổi tên biến cho thống nhất với các file khác
+const jwtAuth = require("../middleware/auth");
+const Notification = require("../models/Notification");
 
 const router = express.Router();
 
@@ -177,6 +177,21 @@ router.post("/update-profile", jwtAuth, async (req, res) => {
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+//=========================================
+// Notifications
+//=========================================
+// API: Lấy danh sách thông báo của User
+router.get("/notifications", jwtAuth, async (req, res) => {
+  try {
+    const notifications = await Notification.find({
+      userId: req.user.userId,
+    }).sort({ createdAt: -1 }); // Mới nhất lên đầu
+    res.json({ success: true, data: notifications });
+  } catch (error) {
+    res.status(500).json({ error: "Lỗi lấy thông báo" });
   }
 });
 
