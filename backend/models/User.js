@@ -14,7 +14,6 @@ const userSchema = new mongoose.Schema({
     enum: ["farmer", "transporter", "manager", "moderator", "admin"],
     default: "farmer",
   },
-  companyName: { type: String, default: "" },
   avatar: { type: String, default: "" },
   walletAddress: {
     type: String,

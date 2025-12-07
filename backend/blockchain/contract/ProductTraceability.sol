@@ -32,6 +32,7 @@ contract ProductTraceability is AccessControl {
         uint256 harvestDate;
         string harvestImageUrl;
         string transporterName;
+        
         uint256 receiveDate;
         string receiveImageUrl;
         uint256 deliveryDate;

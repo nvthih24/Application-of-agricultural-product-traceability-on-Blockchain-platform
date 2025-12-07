@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:intl/intl.dart'; // flutter pub add intl
-import 'home_screen.dart';
+import 'package:intl/intl.dart';
 import 'profile_screen.dart';
+import 'notification_screen.dart';
 
 const Color kInspectorColor = Color(0xFF6A1B9A);
 const Color kInspectorLight = Color(0xFF9C4DCC);
@@ -25,7 +25,8 @@ class _InspectorMainScreenState extends State<InspectorMainScreen> {
   static final List<Widget> _pages = [
     const InspectorDashboardTab(), // Tab 0: Chờ duyệt (Code cũ)
     const InspectorHistoryTab(), // Tab 1: Lịch sử (Mới)
-    const ProfileScreen(), // Tab 2: Tài khoản
+    const NotificationScreen(), // Tab 2: Thông báo
+    const ProfileScreen(), // Tab 3: Tài khoản
   ];
 
   @override
@@ -39,6 +40,10 @@ class _InspectorMainScreenState extends State<InspectorMainScreen> {
             label: 'Chờ duyệt',
           ),
           BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Lịch sử'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.notifications),
+            label: 'Thông báo',
+          ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Tài khoản'),
         ],
         currentIndex: _selectedIndex,
@@ -69,6 +74,8 @@ class _InspectorDashboardTabState extends State<InspectorDashboardTab>
   List<dynamic> pendingPlanting = [];
   List<dynamic> pendingHarvest = [];
 
+  String? _processingItemId;
+
   @override
   void initState() {
     super.initState();
@@ -98,66 +105,13 @@ class _InspectorDashboardTabState extends State<InspectorDashboardTab>
     }
   }
 
-  void _showLogoutDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text("Đăng xuất"),
-          content: const Text(
-            "Bạn có chắc chắn muốn đăng xuất khỏi tài khoản không?",
-          ),
-          actions: [
-            // Nút 1: Quay lại (Hủy)
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context); // Đóng hộp thoại, không làm gì cả
-              },
-              child: const Text(
-                "Quay lại",
-                style: TextStyle(color: Colors.grey),
-              ),
-            ),
-
-            // Nút 2: Đăng xuất (Thực hiện)
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red, // Màu đỏ cảnh báo
-              ),
-              onPressed: () {
-                Navigator.pop(context); // Đóng hộp thoại trước
-                _logout(); // Gọi hàm đăng xuất thật
-              },
-              child: const Text(
-                "Đăng xuất",
-                style: TextStyle(color: Colors.white),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear(); // Xóa token đăng nhập
-
-    if (mounted) {
-      // Xóa sạch lịch sử, quay về trang Home
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
-        (route) => false,
-      );
-    }
-  }
-
   // 2. HÀM DUYỆT / TỪ CHỐI (GỌI TRANSACTION API)
   Future<void> _processRequest(
     Map<String, dynamic> item,
     bool isApproved,
   ) async {
     setState(() => _isLoading = true);
+    _processingItemId = item['id'];
 
     String action = "";
     if (item['type'] == 'planting') {
@@ -180,16 +134,7 @@ class _InspectorDashboardTabState extends State<InspectorDashboardTab>
       );
 
       if (response.statusCode == 200) {
-        // Xóa item khỏi list hiển thị
-        setState(() {
-          if (item['type'] == 'planting') {
-            pendingPlanting.remove(item);
-          } else {
-            pendingHarvest.remove(item);
-          }
-          _isLoading = false;
-        });
-
+        _removeItemFromList(item);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(isApproved ? "Đã DUYỆT thành công!" : "Đã TỪ CHỐI!"),
@@ -197,10 +142,30 @@ class _InspectorDashboardTabState extends State<InspectorDashboardTab>
           ),
         );
       } else {
-        throw Exception(jsonDecode(response.body)['error']);
+        // XỬ LÝ LỖI THÔNG MINH
+        final errorBody = jsonDecode(response.body);
+        final String errorDetails = errorBody['details'] ?? "";
+
+        // Nếu lỗi là "đã làm rồi" (not pending) -> Coi như xong, xóa luôn
+        if (errorDetails.contains("not pending")) {
+          _removeItemFromList(item);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Yêu cầu này đã được xử lý trước đó!"),
+              backgroundColor: Colors.blue,
+            ),
+          );
+        } else {
+          throw Exception(errorBody['error']);
+        }
       }
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _processingItemId = null;
+        });
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Lỗi: $e"), backgroundColor: Colors.red),
       );
@@ -212,6 +177,8 @@ class _InspectorDashboardTabState extends State<InspectorDashboardTab>
       //   else
       //     pendingHarvest.remove(item);
       // });
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
@@ -220,6 +187,17 @@ class _InspectorDashboardTabState extends State<InspectorDashboardTab>
     return DateFormat(
       'dd/MM/yyyy',
     ).format(DateTime.fromMillisecondsSinceEpoch(timestamp * 1000));
+  }
+
+  // Hàm phụ để xóa item khỏi list
+  void _removeItemFromList(Map<String, dynamic> item) {
+    setState(() {
+      if (item['type'] == 'planting') {
+        pendingPlanting.removeWhere((e) => e['id'] == item['id']);
+      } else {
+        pendingHarvest.removeWhere((e) => e['id'] == item['id']);
+      }
+    });
   }
 
   @override
@@ -427,18 +405,30 @@ class _InspectorDashboardTabState extends State<InspectorDashboardTab>
                       ),
                       const SizedBox(height: 5),
                       Text(
-                        item['name'],
+                        item['name'] ?? "Sản phẩm",
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      Text(
-                        "Farm: ${item['farm']}",
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey,
-                        ),
+
+                      const SizedBox(height: 5),
+                      Row(
+                        children: [
+                          const Icon(Icons.store, size: 14, color: Colors.grey),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            // Thêm Expanded để tên dài không bị lỗi
+                            child: Text(
+                              "Farm: ${item['farm'] ?? 'Chưa cập nhật'}",
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
                       Text(
                         "Ngày: ${_formatDate(item['date'])}",
@@ -463,14 +453,29 @@ class _InspectorDashboardTabState extends State<InspectorDashboardTab>
                   ),
                 ),
                 const SizedBox(width: 15),
+                // NÚT DUYỆT
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => _processRequest(item, true),
+                    // Nếu đang loading VÀ đúng là item này -> Disable nút
+                    onPressed: (_isLoading && _processingItemId == item['id'])
+                        ? null
+                        : () => _processRequest(item, true),
+
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       foregroundColor: Colors.white,
                     ),
-                    child: const Text("Chấp thuận"),
+                    // Hiển thị vòng quay nếu đang xử lý đúng item này
+                    child: (_isLoading && _processingItemId == item['id'])
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text("Chấp thuận"),
                   ),
                 ),
               ],

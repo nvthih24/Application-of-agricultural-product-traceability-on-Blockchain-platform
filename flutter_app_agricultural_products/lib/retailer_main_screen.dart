@@ -4,6 +4,11 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'qr_scanner_screen.dart';
 import 'profile_screen.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:mime/mime.dart';
+import 'package:http_parser/http_parser.dart';
+import 'notification_screen.dart';
 
 const Color kRetailerColor = Colors.indigo;
 
@@ -18,9 +23,10 @@ class _RetailerMainScreenState extends State<RetailerMainScreen> {
   int _selectedIndex = 0;
 
   static final List<Widget> _pages = [
-    const RetailerDashboardTab(), // Tab 0: Quản lý kho
-    const Center(child: Text("Thống kê (Đang phát triển)")), // Tab 1
-    const ProfileScreen(), // Tab 2
+    const RetailerDashboardTab(),
+    const Center(child: Text('Thống kê - Đang phát triển')),
+    const NotificationScreen(),
+    const ProfileScreen(),
   ];
 
   @override
@@ -33,6 +39,10 @@ class _RetailerMainScreenState extends State<RetailerMainScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.bar_chart),
             label: 'Thống kê',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.notifications),
+            label: 'Thông báo',
           ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Tài khoản'),
         ],
@@ -47,7 +57,7 @@ class _RetailerMainScreenState extends State<RetailerMainScreen> {
 }
 
 // ==========================================
-// TAB QUẢN LÝ KHO (DASHBOARD)
+// TAB QUẢN LÝ KHO
 // ==========================================
 class RetailerDashboardTab extends StatefulWidget {
   const RetailerDashboardTab({super.key});
@@ -58,7 +68,7 @@ class RetailerDashboardTab extends StatefulWidget {
 
 class _RetailerDashboardTabState extends State<RetailerDashboardTab> {
   List<Map<String, dynamic>> myInventory = [];
-  bool _isLoading = false; // Ban đầu không load vì chưa có API lấy list riêng
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -66,192 +76,7 @@ class _RetailerDashboardTabState extends State<RetailerDashboardTab> {
     _fetchInventoryFromAPI();
   }
 
-  // 1. HÀM QUÉT MÃ NHẬP KHO
-  Future<void> _scanToImport() async {
-    // Mở màn hình quét QR
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const QrScannerScreen(isReturnData: true),
-      ),
-    );
-
-    if (result != null && result.toString().isNotEmpty) {
-      _fetchProductInfoToAdd(result.toString());
-    }
-  }
-
-  // Lấy thông tin sản phẩm từ Blockchain để thêm vào list tạm
-  Future<void> _fetchProductInfoToAdd(String productId) async {
-    setState(() => _isLoading = true);
-    try {
-      final response = await http.get(
-        Uri.parse('http://10.0.2.2:5000/api/products/$productId'),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body)['data'];
-
-        // Kiểm tra trùng
-        if (myInventory.any((e) => e['id'] == productId)) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Sản phẩm này đã có trong danh sách!"),
-              backgroundColor: Colors.orange,
-            ),
-          );
-          setState(() => _isLoading = false);
-          return;
-        }
-
-        // Kiểm tra trạng thái (Phải giao xong mới được nhập)
-        int deliveryDate = data['dates']['delivery'] ?? 0;
-        int price = data['retailer']['price'] ?? 0;
-
-        int status = 2; // Mặc định: Mới nhận
-        String statusText = "Chờ lên kệ";
-
-        if (price > 0) {
-          status = 3;
-          statusText = "Đang bày bán";
-        }
-        // Nếu contract có trạng thái 'Sold' thì check thêm status=4
-
-        setState(() {
-          myInventory.insert(0, {
-            // Thêm lên đầu
-            "id": data['id'],
-            "name": data['name'],
-            "farm": data['farm']['name'],
-            "image": data['images']['planting'] ?? "",
-            "price": price > 0 ? "$price" : "",
-            "statusCode": status,
-            "status": statusText,
-            "time": deliveryDate,
-          });
-          _isLoading = false;
-        });
-        _fetchInventoryFromAPI(); // Lưu lại sau khi thêm
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Đã thêm vào danh sách nhập kho!"),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Không tìm thấy sản phẩm này"),
-            backgroundColor: Colors.red,
-          ),
-        );
-        setState(() => _isLoading = false);
-      }
-    } catch (e) {
-      print(e);
-      setState(() => _isLoading = false);
-    }
-  }
-
-  // 2. HÀM LÊN KỆ (GỌI API UPDATE)
-  Future<void> _updateShelf(Map<String, dynamic> item, String price) async {
-    setState(() => _isLoading = true);
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token');
-
-    try {
-      final response = await http.post(
-        Uri.parse('http://10.0.2.2:5000/api/auth/transactions'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({
-          "action": "updateManagerInfo",
-          "productId": item['id'],
-          "managerReceiveDate": (DateTime.now().millisecondsSinceEpoch / 1000)
-              .floor(),
-          "managerReceiveImageUrl":
-              "", // (Tạm thời để rỗng hoặc thêm chụp ảnh sau)
-          "price": int.parse(price),
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        setState(() {
-          item['statusCode'] = 3;
-          item['status'] = "Đang bày bán";
-          item['price'] = price;
-          _isLoading = false;
-        });
-        _fetchInventoryFromAPI(); // Lưu lại sau khi cập nhật
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Lên kệ thành công!"),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Lỗi: ${response.body}"),
-            backgroundColor: Colors.red,
-          ),
-        );
-        setState(() => _isLoading = false);
-      }
-    } catch (e) {
-      print(e);
-      setState(() => _isLoading = false);
-    }
-  }
-
-  // 3. HÀM BÁN (SOLD)
-  Future<void> _soldProduct(Map<String, dynamic> item) async {
-    setState(() => _isLoading = true);
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token');
-
-    try {
-      final response = await http.post(
-        Uri.parse('http://10.0.2.2:5000/api/auth/transactions'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({
-          "action": "deactivateProduct", // Action đánh dấu đã bán
-          "productId": item['id'],
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        setState(() {
-          item['statusCode'] = 4;
-          item['status'] = "Đã bán hết";
-          _isLoading = false;
-        });
-        _fetchInventoryFromAPI(); // Lưu lại sau khi cập nhật
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Xác nhận bán thành công!"),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Lỗi: ${response.body}"),
-            backgroundColor: Colors.red,
-          ),
-        );
-        setState(() => _isLoading = false);
-      }
-    } catch (e) {
-      setState(() => _isLoading = false);
-    }
-  }
-
+  // --- API: LOAD DANH SÁCH ---
   Future<void> _fetchInventoryFromAPI() async {
     setState(() => _isLoading = true);
     final prefs = await SharedPreferences.getInstance();
@@ -277,49 +102,326 @@ class _RetailerDashboardTabState extends State<RetailerDashboardTab> {
     }
   }
 
-  // UI DIALOG NHẬP GIÁ
+  // --- HÀM UPLOAD ẢNH (MỚI THÊM) ---
+  Future<String?> _uploadImage(File imageFile) async {
+    try {
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('http://10.0.2.2:5000/api/upload/image'),
+      );
+      final mimeType = lookupMimeType(imageFile.path);
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'image',
+          imageFile.path,
+          contentType: MediaType.parse(mimeType ?? 'image/jpeg'),
+        ),
+      );
+      final response = await request.send();
+      if (response.statusCode == 200) {
+        final data = jsonDecode(await response.stream.bytesToString());
+        return data['url'];
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // --- API: QUÉT NHẬP KHO ---
+  Future<void> _scanToImport() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const QrScannerScreen(isReturnData: true),
+      ),
+    );
+    if (result != null && result.toString().isNotEmpty) {
+      _fetchProductInfoToAdd(result.toString());
+    }
+  }
+
+  Future<void> _fetchProductInfoToAdd(String productId) async {
+    setState(() => _isLoading = true);
+    try {
+      final response = await http.get(
+        Uri.parse('http://10.0.2.2:5000/api/products/$productId'),
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body)['data'];
+
+        if (myInventory.any((e) => e['id'] == productId)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Sản phẩm này đã có trong kho!"),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          setState(() => _isLoading = false);
+          return;
+        }
+
+        int deliveryDate = data['dates']['delivery'] ?? 0;
+        int price = data['retailer']['price'] ?? 0;
+        int status = 2;
+        String statusText = "Chờ lên kệ";
+        if (price > 0) {
+          status = 3;
+          statusText = "Đang bày bán";
+        }
+
+        setState(() {
+          myInventory.insert(0, {
+            "id": data['id'],
+            "name": data['name'],
+            "farm": data['farm']['name'],
+            "image": data['images']['planting'] ?? "",
+            "price": price > 0 ? "$price" : "",
+            "statusCode": status,
+            "status": statusText,
+            "time": deliveryDate,
+          });
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Đã nhập kho thành công!"),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Không tìm thấy sản phẩm"),
+            backgroundColor: Colors.red,
+          ),
+        );
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  // --- API: LÊN KỆ (CẬP NHẬT GIÁ & ẢNH) ---
+  Future<void> _updateShelf(
+    Map<String, dynamic> item,
+    String price,
+    String imageUrl,
+  ) async {
+    setState(() => _isLoading = true);
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    try {
+      final response = await http.post(
+        Uri.parse('http://10.0.2.2:5000/api/auth/transactions'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          "action": "updateManagerInfo",
+          "productId": item['id'],
+          "managerReceiveDate": (DateTime.now().millisecondsSinceEpoch / 1000)
+              .floor(),
+          "managerReceiveImageUrl": imageUrl, // GỬI ẢNH THẬT LÊN
+          "price": int.parse(price),
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Lên kệ thành công!"),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _fetchInventoryFromAPI(); // Reload lại list
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Lỗi: ${response.body}"),
+            backgroundColor: Colors.red,
+          ),
+        );
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  // --- API: BÁN HÀNG ---
+  Future<void> _soldProduct(Map<String, dynamic> item) async {
+    setState(() => _isLoading = true);
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    try {
+      final response = await http.post(
+        Uri.parse('http://10.0.2.2:5000/api/auth/transactions'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          "action": "deactivateProduct",
+          "productId": item['id'],
+        }),
+      );
+      if (response.statusCode == 200) {
+        setState(() {
+          item['statusCode'] = 4;
+          item['status'] = "Đã bán hết";
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Đã bán xong!"),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _fetchInventoryFromAPI();
+      } else {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  // --- UI: DIALOG CẬP NHẬT (CÓ CHỤP ẢNH) ---
   void _showUpdateShelfInfo(BuildContext context, Map<String, dynamic> item) {
     final priceController = TextEditingController();
+    File? shelfImage;
+    bool isUploading = false; // Loading cục bộ trong dialog
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Cập nhật giá bán"),
-        content: TextField(
-          controller: priceController,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: "Giá bán lẻ (VNĐ)",
-            suffixText: "đ",
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Hủy"),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              if (priceController.text.isNotEmpty) {
-                _updateShelf(item, priceController.text);
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: kRetailerColor),
-            child: const Text("Lên Kệ", style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text("Lên Kệ & Định Giá"),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    "Nhập giá bán và chụp ảnh trưng bày tại quầy.",
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 15),
+
+                  // 1. Nhập giá
+                  TextField(
+                    controller: priceController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: "Giá bán (VNĐ)",
+                      suffixText: "đ",
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+
+                  const SizedBox(height: 15),
+
+                  // 2. Chụp ảnh
+                  InkWell(
+                    onTap: () async {
+                      final ImagePicker picker = ImagePicker();
+                      final XFile? img = await picker.pickImage(
+                        source: ImageSource.camera,
+                      );
+                      if (img != null) {
+                        setDialogState(() => shelfImage = File(img.path));
+                      }
+                    },
+                    child: Container(
+                      height: 120,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: shelfImage != null
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.file(shelfImage!, fit: BoxFit.cover),
+                            )
+                          : const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.add_a_photo, color: Colors.grey),
+                                Text("Chụp ảnh quầy"),
+                              ],
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Hủy"),
+                ),
+                ElevatedButton(
+                  onPressed: isUploading
+                      ? null
+                      : () async {
+                          if (priceController.text.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text("Chưa nhập giá!")),
+                            );
+                            return;
+                          }
+
+                          // Upload ảnh nếu có (Không bắt buộc nhưng nên có)
+                          String imageUrl = "";
+                          setDialogState(() => isUploading = true);
+
+                          if (shelfImage != null) {
+                            String? url = await _uploadImage(shelfImage!);
+                            if (url != null) imageUrl = url;
+                          }
+
+                          Navigator.pop(context); // Đóng dialog
+                          _updateShelf(
+                            item,
+                            priceController.text,
+                            imageUrl,
+                          ); // Gọi hàm update
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kRetailerColor,
+                  ),
+                  child: isUploading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(color: Colors.white),
+                        )
+                      : const Text(
+                          "Xác nhận",
+                          style: TextStyle(color: Colors.white),
+                        ),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
-  // UI DIALOG XÁC NHẬN BÁN
+  // ... (Hàm _showSellDialog và UI chính giữ nguyên) ...
   void _showSellDialog(BuildContext context, Map<String, dynamic> item) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("Xác nhận bán hàng"),
-        content: Text("Bạn xác nhận lô hàng ${item['name']} đã bán hết?"),
+        content: Text("Xác nhận lô hàng ${item['name']} đã được bán hết?"),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -362,18 +464,15 @@ class _RetailerDashboardTabState extends State<RetailerDashboardTab> {
           ],
         ),
       ),
-
-      // NÚT QUÉT
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _scanToImport,
         backgroundColor: kRetailerColor,
-        icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
+        icon: const Icon(Icons.qr_code_2, color: Colors.white),
         label: const Text(
           "Quét Nhập Kho",
           style: TextStyle(color: Colors.white),
         ),
       ),
-
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : myInventory.isEmpty
@@ -405,9 +504,9 @@ class _RetailerDashboardTabState extends State<RetailerDashboardTab> {
   }
 
   String _formatDate(int timestamp) {
-    if (timestamp == 0) return "N/A";
+    if (timestamp == 0) return "Vừa tới";
     final date = DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);
-    return "${date.hour}:${date.minute} - ${date.day}/${date.month}/${date.year}";
+    return "${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')} - ${date.day}/${date.month}/${date.year}";
   }
 
   Widget _buildProductCard(Map<String, dynamic> item) {
@@ -416,9 +515,8 @@ class _RetailerDashboardTabState extends State<RetailerDashboardTab> {
         ? Colors.orange
         : (status == 3 ? Colors.green : Colors.grey);
     int time = item['time'] ?? 0;
-    String arrivalTime = item['time'] != null
-        ? _formatDate(item['time'])
-        : "Vừa tới";
+    String arrivalTime = _formatDate(time);
+
     return Card(
       margin: const EdgeInsets.only(bottom: 15),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -506,12 +604,9 @@ class _RetailerDashboardTabState extends State<RetailerDashboardTab> {
                       ],
                     ],
                   ),
-                  const SizedBox(height: 4),
                 ],
               ),
             ),
-
-            // NÚT HÀNH ĐỘNG
             if (status == 2) ...[
               // Mới nhập -> Cần lên kệ
               const Divider(),
@@ -546,6 +641,31 @@ class _RetailerDashboardTabState extends State<RetailerDashboardTab> {
                   ),
                   icon: const Icon(Icons.check_circle, size: 18),
                   label: const Text("Xác nhận Đã Bán Hết"),
+                ),
+              ),
+            ] else if (status == 4) ...[
+              const Divider(),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(Icons.lock, size: 16, color: Colors.grey),
+                    SizedBox(width: 5),
+                    Text(
+                      "Đã bán hết / Ngưng kinh doanh",
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],

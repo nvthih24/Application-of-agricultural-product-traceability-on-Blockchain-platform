@@ -94,19 +94,23 @@ class _FarmDetailScreenState extends State<FarmDetailScreen> {
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  (avatar != null && avatar.isNotEmpty)
-                      ? Image.network(
-                          avatar,
-                          fit: BoxFit.cover,
-                          errorBuilder: (c, e, s) => Image.asset(
+                  Hero(
+                    tag:
+                        "farm_img_${widget.farmData['_id'] ?? widget.farmData['phone']}", // Tag giống bên Home
+                    child: (avatar != null && avatar.isNotEmpty)
+                        ? Image.network(
+                            avatar,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Image.asset(
+                              'assets/images/farm_1.jpg',
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : Image.asset(
                             'assets/images/farm_1.jpg',
                             fit: BoxFit.cover,
                           ),
-                        )
-                      : Image.asset(
-                          'assets/images/farm_1.jpg',
-                          fit: BoxFit.cover,
-                        ),
+                  ),
                   Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -114,7 +118,7 @@ class _FarmDetailScreenState extends State<FarmDetailScreen> {
                         end: Alignment.bottomCenter,
                         colors: [
                           Colors.transparent,
-                          Colors.black.withOpacity(0.5),
+                          Colors.black.withOpacity(0.6),
                         ],
                       ),
                     ),
@@ -268,19 +272,23 @@ class _FarmDetailScreenState extends State<FarmDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(15),
-              ),
-              child: Image.network(
-                product['image'],
-                height: 90,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (c, e, s) => Container(
+            Hero(
+              tag:
+                  "product_img_${product['id']}", // Tag duy nhất theo ID sản phẩm
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(15),
+                ),
+                child: Image.network(
+                  product['image'],
                   height: 90,
-                  color: Colors.grey[200],
-                  child: const Icon(Icons.image),
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (c, e, s) => Container(
+                    height: 90,
+                    color: Colors.grey[200],
+                    child: const Icon(Icons.image),
+                  ),
                 ),
               ),
             ),
