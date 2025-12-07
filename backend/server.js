@@ -7,6 +7,8 @@ const uploadRoutes = require("./routes/upload");
 const qrCodeRoutes = require("./routes/qrcodes");
 const transactionRoutes = require("./routes/transaction");
 const productRoutes = require("./routes/product");
+const forgotPasswordRoutes = require("./routes/forgotPassword");
+
 
 const app = express();
 
@@ -20,6 +22,8 @@ app.use("/api/qrcodes", qrCodeRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/auth/transactions", transactionRoutes);
 app.use("/api/products", productRoutes);
+app.use("/api/forgot-password", forgotPasswordRoutes);
+
 
 mongoose
   .connect(process.env.MONGO_URI)

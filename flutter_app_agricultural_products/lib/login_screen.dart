@@ -8,6 +8,7 @@ import 'farmer_main_screen.dart';
 import 'transporter_main_screen.dart';
 import 'inspector_main_screen.dart';
 import 'retailer_main_screen.dart';
+import 'forgot_password_screen.dart';
 
 const Color kPrimaryColor = Color(0xFF00C853); // Màu xanh chủ đạo
 
@@ -174,7 +175,14 @@ class _LoginScreenState extends State<LoginScreen> {
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
-                onPressed: () {},
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ForgotPasswordScreen(),
+                    ),
+                  );
+                },
                 child: const Text(
                   "Quên mật khẩu?",
                   style: TextStyle(

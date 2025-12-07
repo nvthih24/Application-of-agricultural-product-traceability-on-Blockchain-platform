@@ -508,7 +508,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               "Chỉnh sửa thông tin cá nhân",
               () {},
             ),
-            _buildProfileOption(Icons.lock_outline, "Đổi mật khẩu", () {}),
+
             _buildProfileOption(
               Icons.account_balance_wallet_outlined,
               "Ví Blockchain",
