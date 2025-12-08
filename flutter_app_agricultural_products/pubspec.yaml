@@ -58,7 +58,13 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: "^0.13.1" # Tạo icon cho app
 
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: true
+  image_path: "assets/images/3TMLNS.ico" # Đảm bảo ông đã có ảnh này trong thư mục assets/images
+  min_sdk_android: 21
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
@@ -74,6 +80,9 @@ flutter:
     - assets/images/banner-2.jpg
     - assets/images/farm_1.jpg
     - assets/images/fruit.png
+    - assets/images/lua.jpg
+    - assets/images/3TMLNS.ico
+    - assets/images/cai_thia.jpg
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
