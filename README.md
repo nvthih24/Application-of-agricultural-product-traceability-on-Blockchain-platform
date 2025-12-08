@@ -12,7 +12,7 @@
 This app connects to the **AgriTrace Backend** to interact with Smart Contracts, ensuring data transparency, immutability, and trust across the supply chain.
 
 > **Related Repository:**
-> * 🔗 **Backend Server (Node.js & Smart Contracts):** [Link-to-your-AgriTrace-Backend-Repo]
+> * 🔗 **Backend Server (Node.js & Smart Contracts):** [https://github.com/nvthih24/AgriTrace-Backend](https://github.com/nvthih24/AgriTrace-Backend)
 
 ## 📱 Key Features
 
@@ -50,12 +50,11 @@ This app connects to the **AgriTrace Backend** to interact with Smart Contracts,
 
 | Farmer Dashboard | Add Crop (Camera) | Home & Filtering | Product Traceability |
 |:---:|:---:|:---:|:---:|
-| <img src="assets/screenshots/farmer_dashboard.png" width="200"> | <img src="assets/screenshots/add_crop.png" width="200"> | <img src="assets/screenshots/home_filter.png" width="200"> | <img src="assets/screenshots/traceability.png" width="200"> |
-
-*(Note: Please update the image paths to your actual screenshot files)*
+| <img src="app/assets/screenshots/dashboard.png" width="200"> | <img src="app/assets/screenshots/add_crop.png" width="200"> | <img src="app/assets/screenshots/home.png" width="200"> | <img src="app/assets/screenshots/trace.png" width="200"> |
 
 ## 📂 Project Structure
 
+```bash
 AgriTrace-Mobile/
 ├── 📁 app
 │   ├── 📁 android
@@ -353,7 +352,7 @@ AgriTrace-Mobile/
 │   └── ⚙️ pubspec.yaml
 ├── ⚙️ .gitignore
 └── 📝 README.md
-
+````
 
 ## 🚀 Getting Started
 
@@ -369,31 +368,36 @@ To run this application locally, you need to have the **Backend Server** running
 
 1.  **Clone the repository:**
 
-    git clone [https://github.com/nvthih24/AgriTrace-Mobile.git](https://github.com/nvthih24/AgriTrace-Mobile.git)
+    ```bash
+    git clone https://github.com/nvthih24/AgriTrace-Mobile.git
+    ```
 
+2.  **Navigate to the project directory:**
 
-2.  **Navigate to project directory:**
-
-    cd AgriTrace-Mobile/app  
-    # (Or just cd AgriTrace-Mobile if you moved code to root)
-
+    ```bash
+    cd AgriTrace-Mobile/app
+    ```
 
 3.  **Install dependencies:**
 
+    ```bash
     flutter pub get
-
+    ```
 
 4.  **Configure API URL:**
     Open `lib/configs/constants.dart` and update your backend URL:
 
+    ```dart
     class Constants {
-      static const String baseUrl = "[https://your-backend-url.onrender.com/api](https://your-backend-url.onrender.com/api)";
+      static const String baseUrl = "https://your-backend-url.onrender.com/api";
     }
-
+    ```
 
 5.  **Run the app:**
 
+    ```bash
     flutter run
+    ```
 
 ## 🤝 Contributing
 
@@ -403,22 +407,5 @@ Contributions are welcome\! If you have suggestions for improvements, please ope
 
 This project is licensed under the MIT License.
 
-
----
-
-### 💡 Hướng dẫn ông hoàn thiện nốt:
-
-1.  **Chụp ảnh màn hình (Screenshots):**
-    * Ông mở App lên (trên máy ảo hoặc điện thoại thật).
-    * Chụp lại 4 màn hình đẹp nhất:
-        1.  **Dashboard Nông dân** (Thấy danh sách sản phẩm).
-        2.  **Gieo trồng mới** (Lúc bật cái menu chọn Camera/Thư viện lên).
-        3.  **Trang chủ (Home)** (Đang chọn filter "Trái cây" hoặc "Rau củ").
-        4.  **Truy xuất nguồn gốc** (Cái timeline đẹp đẹp ấy).
-    * Tạo một thư mục tên là `screenshots` trong folder dự án (ngang hàng với `lib`), bỏ ảnh vào đó.
-    * Cập nhật lại đường dẫn trong bảng `| Screenshot |` ở file README trên.
-
-2.  **Link Backend:**
-    * Ở phần **Introduction**, chỗ `[Link-to-your-AgriTrace-Backend-Repo]`, ông nhớ paste cái link GitHub Backend mới của ông vào nhé (`https://github.com/nvthih24/AgriTrace-Backend`).
-
-Làm xong cái này nhìn Repo của ông bao uy tín luôn! Chúc ông bảo vệ đồ án thành công rực rỡ nhé! 🔥
+```
+```
