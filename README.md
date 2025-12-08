@@ -12,44 +12,48 @@
 This app connects to the **AgriTrace Backend** to interact with Smart Contracts, ensuring data transparency, immutability, and trust across the supply chain.
 
 > **Related Repository:**
-> * 🔗 **Backend Server (Node.js & Smart Contracts):** [https://github.com/nvthih24/AgriTrace-Backend](https://github.com/nvthih24/AgriTrace-Backend)
+>
+> - 🔗 **Backend Server (Node.js & Smart Contracts):** [https://github.com/nvthih24/AgriTrace-Backend](https://github.com/nvthih24/AgriTrace-Backend)
 
 ## 📱 Key Features
 
 ### 👨‍🌾 For Farmers
-* **Secure Login:** Role-based authentication.
-* **Dashboard:** Overview of crops, planting status, and harvest statistics.
-* **Add Crop (Start Season):** Register new planting batches on Blockchain.
-    * 📸 **Evidence:** Capture real-time photos via **Camera** or select from **Gallery**.
-    * ☁️ **Storage:** Automatic image upload to Cloudinary.
-* **Harvest Management:** Update harvest quantity, quality, and status.
+
+- **Secure Login:** Role-based authentication.
+- **Dashboard:** Overview of crops, planting status, and harvest statistics.
+- **Add Crop (Start Season):** Register new planting batches on Blockchain.
+  - 📸 **Evidence:** Capture real-time photos via **Camera** or select from **Gallery**.
+  - ☁️ **Storage:** Automatic image upload to Cloudinary.
+- **Harvest Management:** Update harvest quantity, quality, and status.
 
 ### 🚚 For Transporters & Retailers
-* **Shipment Tracking:** Update location and transport status (Pickup/Delivery).
-* **Retail Management:** Update selling price and shelf status.
+
+- **Shipment Tracking:** Update location and transport status (Pickup/Delivery).
+- **Retail Management:** Update selling price and shelf status.
 
 ### 🛒 For Consumers (Guest)
-* **Smart Filtering:** Filter products by categories (Fruits, Vegetables, Rice, Seeds...) directly on the Home Screen.
-* **Traceability Timeline:** View the full history of a product with a visual timeline:
-    * 🌱 Planting Origin (Seed source, Farmer info).
-    * 💧 Care Log (Watering, Fertilizing).
-    * 🚜 Harvest details.
-    * 🚛 Transportation path.
-    * 🏪 Retailer info & Price.
-* **Blockchain Verification:** Direct link to verify transaction hash on the blockchain explorer.
+
+- **Smart Filtering:** Filter products by categories (Fruits, Vegetables, Rice, Seeds...) directly on the Home Screen.
+- **Traceability Timeline:** View the full history of a product with a visual timeline:
+  - 🌱 Planting Origin (Seed source, Farmer info).
+  - 💧 Care Log (Watering, Fertilizing).
+  - 🚜 Harvest details.
+  - 🚛 Transportation path.
+  - 🏪 Retailer info & Price.
+- **Blockchain Verification:** Direct link to verify transaction hash on the blockchain explorer.
 
 ## 🛠️ Tech Stack & Architecture
 
-* **Framework:** Flutter (Dart)
-* **Architecture:** MVC / Provider Pattern
-* **Networking:** HTTP (REST API integration)
-* **Media:** Image Picker (Camera/Gallery), Multipart Upload
-* **UI Components:** Material Design 3, Custom Timeline Views, Shimmer Loading.
+- **Framework:** Flutter (Dart)
+- **Architecture:** MVC / Provider Pattern
+- **Networking:** HTTP (REST API integration)
+- **Media:** Image Picker (Camera/Gallery), Multipart Upload
+- **UI Components:** Material Design 3, Custom Timeline Views, Shimmer Loading.
 
 ## 📸 Screenshots
 
-| Farmer Dashboard | Add Crop (Camera) | Home & Filtering | Product Traceability |
-|:---:|:---:|:---:|:---:|
+|                       Farmer Dashboard                       |                      Add Crop (Camera)                      |                    Home & Filtering                     |                   Product Traceability                   |
+| :----------------------------------------------------------: | :---------------------------------------------------------: | :-----------------------------------------------------: | :------------------------------------------------------: |
 | <img src="app/assets/screenshots/dashboard.png" width="200"> | <img src="app/assets/screenshots/add_crop.png" width="200"> | <img src="app/assets/screenshots/home.png" width="200"> | <img src="app/assets/screenshots/trace.png" width="200"> |
 
 ## 📂 Project Structure
@@ -352,7 +356,7 @@ AgriTrace-Mobile/
 │   └── ⚙️ pubspec.yaml
 ├── ⚙️ .gitignore
 └── 📝 README.md
-````
+```
 
 ## 🚀 Getting Started
 
@@ -360,9 +364,9 @@ To run this application locally, you need to have the **Backend Server** running
 
 ### Prerequisites
 
-  * Flutter SDK (Latest Stable)
-  * Android Studio / VS Code
-  * AgriTrace Backend running (Localhost or Render URL)
+- Flutter SDK (Latest Stable)
+- Android Studio / VS Code
+- AgriTrace Backend running (Localhost or Render URL)
 
 ### Installation
 
@@ -408,4 +412,5 @@ Contributions are welcome\! If you have suggestions for improvements, please ope
 This project is licensed under the MIT License.
 
 ```
+
 ```
