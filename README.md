@@ -410,7 +410,3 @@ Contributions are welcome\! If you have suggestions for improvements, please ope
 ## 📄 License
 
 This project is licensed under the MIT License.
-
-```
-
-```
