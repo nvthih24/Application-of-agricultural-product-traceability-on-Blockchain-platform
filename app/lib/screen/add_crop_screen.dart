@@ -30,7 +30,6 @@ class _AddCropScreenState extends State<AddCropScreen> {
   // Biến lưu tên nông trại tự động
   String _farmName = "Đang tải...";
 
-  File? _plantingImage;
   bool _isLoading = false;
 
   @override

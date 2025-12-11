@@ -33,6 +33,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _userRole = "Khách";
   String _rawRole = "";
   String _userAvatar = "";
+  bool _isCheckingStatus = true;
 
   @override
   void initState() {
@@ -50,6 +51,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _isLoggedIn = false;
         _isLoading = false;
+        _isCheckingStatus = false;
       });
       return;
     }
@@ -80,7 +82,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       print("Lỗi load profile: $e");
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() => _isCheckingStatus = false);
       }
     }
   }
@@ -106,6 +108,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (user['fullName'] != null)
       await prefs.setString('fullName', user['fullName']);
     if (user['avatar'] != null) await prefs.setString('avatar', user['avatar']);
+    if (user['phone'] != null) await prefs.setString('phone', user['phone']);
     if (user['companyName'] != null) {
       await prefs.setString('companyName', user['companyName']);
       await prefs.setString('farmName', user['companyName']);
@@ -136,6 +139,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           "companyName": _farmNameController.text,
         }),
       );
+      print("Status Code: ${response.statusCode}");
+      print("Response Body: ${response.body}");
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body)['user'];
@@ -150,9 +155,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           FocusScope.of(context).unfocus(); // Ẩn bàn phím
         }
       } else {
-        throw Exception("Lỗi server");
+        throw Exception("Lỗi server: ${response.statusCode}");
       }
     } catch (e) {
+      print("Lỗi cập nhật profile: $e");
       if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -161,7 +167,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         );
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -241,6 +249,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // --- UI CHÍNH ---
   @override
   Widget build(BuildContext context) {
+    if (_isCheckingStatus) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(child: CircularProgressIndicator(color: kPrimaryColor)),
+      );
+    }
+
     if (!_isLoggedIn) return _buildGuestView();
 
     return Scaffold(
@@ -317,7 +332,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 15),
                     _buildTextField(
                       _rawRole == 'farmer'
-                          ? "Tên Nông Trại (Hiển thị công khai)"
+                          ? "Tên Nông Trại"
                           : "Tên Công Ty Vận Tải",
                       _farmNameController,
                       _rawRole == 'farmer'
