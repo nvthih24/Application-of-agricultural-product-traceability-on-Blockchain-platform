@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+
 import 'dart:convert';
+
 import 'product_trace_screen.dart';
+
 import '../configs/constants.dart';
 
 const Color kPrimaryColor = Color(0xFF00C853);

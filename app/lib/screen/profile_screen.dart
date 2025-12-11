@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'login_screen.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:mime/mime.dart';
 import 'package:http_parser/http_parser.dart';
+
+import 'dart:convert';
+import 'dart:io';
+
 import '../configs/constants.dart';
+
 import 'home_screen.dart';
+import 'login_screen.dart';
 
 // Màu chủ đạo (Lấy màu xanh lá nông nghiệp)
 const Color kPrimaryColor = Color(0xFF2E7D32);
@@ -33,7 +36,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _userRole = "Khách";
   String _rawRole = "";
   String _userAvatar = "";
-  bool _isCheckingStatus = true;
+  bool _isSaving = false;
+  bool _isFetching = true;
 
   @override
   void initState() {
@@ -43,7 +47,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // 1. API: TẢI THÔNG TIN
   Future<void> _loadUserProfile() async {
-    setState(() => _isLoading = true);
+    setState(() => _isFetching = true);
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
 
@@ -51,7 +55,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _isLoggedIn = false;
         _isLoading = false;
-        _isCheckingStatus = false;
+        _isFetching = false;
       });
       return;
     }
@@ -77,12 +81,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           _saveToPrefs(data);
         });
+      } else {
+        setState(() {
+          _isLoggedIn = false;
+        });
       }
     } catch (e) {
       print("Lỗi load profile: $e");
+      setState(() {
+        _isLoggedIn = false;
+      });
     } finally {
       if (mounted) {
-        setState(() => _isCheckingStatus = false);
+        setState(() => _isFetching = false);
       }
     }
   }
@@ -123,7 +134,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ).showSnackBar(const SnackBar(content: Text("Vui lòng nhập họ tên")));
       return;
     }
-    setState(() => _isLoading = true);
+    setState(() => _isSaving = true);
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
 
@@ -168,7 +179,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() => _isSaving = false);
       }
     }
   }
@@ -249,13 +260,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // --- UI CHÍNH ---
   @override
   Widget build(BuildContext context) {
-    if (_isCheckingStatus) {
+    if (_isFetching) {
       return const Scaffold(
         backgroundColor: Colors.white,
         body: Center(child: CircularProgressIndicator(color: kPrimaryColor)),
       );
     }
-
     if (!_isLoggedIn) return _buildGuestView();
 
     return Scaffold(
@@ -399,7 +409,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         elevation: 5,
                         shadowColor: kPrimaryColor.withOpacity(0.4),
                       ),
-                      child: _isLoading
+                      child: _isSaving
                           ? const CircularProgressIndicator(color: Colors.white)
                           : const Text(
                               "LƯU THAY ĐỔI",

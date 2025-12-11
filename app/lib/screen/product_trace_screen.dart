@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+import 'dart:convert';
+
 import '../configs/constants.dart';
 
 class ProductTraceScreen extends StatefulWidget {
@@ -124,7 +126,7 @@ class _ProductTraceScreenState extends State<ProductTraceScreen> {
                 ),
                 const SizedBox(height: 15),
                 Text(
-                  _data!['name'] ,
+                  _data!['name'],
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,

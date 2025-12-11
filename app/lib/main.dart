@@ -1,10 +1,7 @@
-// lib/main.dart
-
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-// Import các màn hình của ông
+// Import các màn hình chính theo vai trò
 import 'screen/home_screen.dart';
-import 'screen/login_screen.dart';
 import 'screen/farmer_main_screen.dart';
 import 'screen/transporter_main_screen.dart';
 import 'screen/retailer_main_screen.dart';

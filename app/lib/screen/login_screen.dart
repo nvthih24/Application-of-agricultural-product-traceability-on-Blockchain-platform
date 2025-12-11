@@ -1,14 +1,17 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'signup_screen.dart'; // Import màn hình đăng ký
+
+import 'signup_screen.dart';
 import 'home_screen.dart';
 import 'farmer_main_screen.dart';
 import 'transporter_main_screen.dart';
 import 'inspector_main_screen.dart';
 import 'retailer_main_screen.dart';
 import 'forgot_password_screen.dart';
+
 import '../configs/constants.dart';
 
 const Color kPrimaryColor = Color(0xFF00C853); // Màu xanh chủ đạo

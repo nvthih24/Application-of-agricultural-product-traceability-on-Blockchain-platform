@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+
 import 'product_trace_screen.dart';
 
 class QrScannerScreen extends StatefulWidget {

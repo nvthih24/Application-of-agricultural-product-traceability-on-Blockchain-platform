@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'qr_scanner_screen.dart';
-import 'profile_screen.dart';
-import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:mime/mime.dart';
 import 'package:http_parser/http_parser.dart';
-import 'notification_screen.dart';
+
+import 'dart:convert';
+import 'dart:io';
+
 import '../configs/constants.dart';
+
+import 'qr_scanner_screen.dart';
+import 'profile_screen.dart';
+import 'notification_screen.dart';
 
 // Màu chủ đạo: Xanh dương đậm (Logistics) + Gradient
 const Color kTransporterDark = Color(0xFF0D47A1);

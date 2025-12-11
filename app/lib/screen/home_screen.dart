@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:carousel_slider/carousel_slider.dart'; // Nhớ import cái này
+import 'package:carousel_slider/carousel_slider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'qr_scanner_screen.dart';
@@ -84,9 +84,12 @@ class _HomeContentState extends State<HomeContent> {
 
   // Danh sách Banner quảng cáo
   final List<String> imgList = [
-    'assets/images/banner-2.jpg', // Ảnh 1 (Nhớ đảm bảo file tồn tại)
-    'assets/images/farm_1.jpg', // Ảnh 2
-    'assets/images/fruit.png', // Ảnh 3
+    'assets/images/banner-1.jpg',
+    'assets/images/banner-2.jpg',
+    'assets/images/banner-3.jpg',
+    'assets/images/banner-4.jpg',
+    'assets/images/banner-5.jpg',
+    'assets/images/banner-6.jpg',
   ];
 
   // Hàm lọc danh sách dựa trên Tên sản phẩm
@@ -131,7 +134,7 @@ class _HomeContentState extends State<HomeContent> {
   @override
   void initState() {
     super.initState();
-    _fetchData(); // Gọi cả 2 API
+    _fetchData(); // Lấy dữ liệu khi khởi tạo
   }
 
   Future<void> _fetchData() async {
@@ -144,7 +147,7 @@ class _HomeContentState extends State<HomeContent> {
         final data = jsonDecode(resFarms.body);
         setState(() {
           _allFarms = data['data'];
-          _filteredFarms = _allFarms;
+          _filteredFarms = _allFarms; // Hiển thị tất cả ban đầu
         });
       }
 
