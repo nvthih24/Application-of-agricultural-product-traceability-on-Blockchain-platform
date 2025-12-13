@@ -25,3 +25,28 @@ Future<void> saveDeviceToken(String userId, String token) async {
     print("❌ [Flutter] Lỗi kết nối: $e");
   }
 }
+
+// Thêm tham số secretKey vào hàm
+Future<http.Response> register(
+  String fullName,
+  String email,
+  String password,
+  String role,
+  String companyName,
+  String secretKey, // <--- THÊM CÁI NÀY
+) async {
+  final url = Uri.parse('${Constants.baseUrl}/auth/register');
+
+  return await http.post(
+    url,
+    headers: {'Content-Type': 'application/json'},
+    body: jsonEncode({
+      'fullName': fullName,
+      'email': email,
+      'password': password,
+      'role': role,
+      'companyName': companyName,
+      'secretKey': secretKey, // <--- GỬI LÊN SERVER
+    }),
+  );
+}

@@ -25,15 +25,33 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
+  // 🔥 1. Thêm Controller cho Mã Bí Mật
+  final _secretKeyController = TextEditingController();
+
   // Vai trò mặc định là 'farmer' (Nông dân)
-  // Backend của bạn quy định enum: ['farmer', 'transporter', 'manager'...]
   String _selectedRole = 'farmer';
+  final Map<String, String> _roles = {
+    'farmer': 'Nông Dân',
+    'transporter': 'Nhà Vận Chuyển',
+    'moderator': 'Kiểm Duyệt Viên',
+    'manager': 'Nhà Bán Lẻ',
+  };
+
   bool _isLoading = false;
 
   Future<void> _register() async {
     // Validate cơ bản
     if (_passwordController.text != _confirmPasswordController.text) {
       _showMsg("Mật khẩu xác nhận không khớp!", isError: true);
+      return;
+    }
+
+    // Validate Secret Key (Không được để trống)
+    if (_secretKeyController.text.trim().isEmpty) {
+      _showMsg(
+        "Vui lòng nhập mã xác thực cho vai trò ${_roles[_selectedRole]}",
+        isError: true,
+      );
       return;
     }
 
@@ -55,8 +73,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
           'address': _addressController.text,
           'password': _passwordController.text,
           'confirmPassword': _confirmPasswordController.text,
-          'role': _selectedRole, // Gửi vai trò lên
-          // walletAddress để null, sẽ cập nhật sau
+          'role': _selectedRole,
+          // 🔥 2. Gửi secretKey lên Server
+          'secretKey': _secretKeyController.text.trim(),
         }),
       );
 
@@ -74,7 +93,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
           }
         });
       } else {
-        // Lỗi từ Backend (ví dụ: Email trùng)
+        // Lỗi từ Backend (ví dụ: Sai mã xác thực, Email trùng)
         final data = jsonDecode(response.body);
         _showMsg(data['msg'] ?? "Đăng ký thất bại", isError: true);
       }
@@ -138,9 +157,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
             // Chọn Vai Trò (Quan trọng)
             DropdownButtonFormField<String>(
               value: _selectedRole,
-
               isExpanded: true,
-
               decoration: InputDecoration(
                 labelText: "Vai trò của bạn",
                 prefixIcon: const Icon(Icons.work, color: kPrimaryColor),
@@ -152,45 +169,49 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   vertical: 15,
                 ),
               ),
-              items: const [
-                DropdownMenuItem(
-                  value: 'farmer',
+              items: _roles.entries.map((entry) {
+                return DropdownMenuItem(
+                  value: entry.key,
                   child: Text(
-                    "Chủ Nông Trại (Farmer)",
+                    entry.value,
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,
                   ),
-                ),
-                DropdownMenuItem(
-                  value: 'transporter',
-                  child: Text(
-                    "Nhà Vận Chuyển (Transporter)",
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
-                ),
-                DropdownMenuItem(
-                  value: 'moderator',
-                  child: Text(
-                    "Kiểm Duyệt Viên (Moderator)",
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
-                ),
-                DropdownMenuItem(
-                  value: 'manager',
-                  child: Text(
-                    "Nhà Bán Lẻ (Manager)",
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
-                ),
-              ],
+                );
+              }).toList(),
               onChanged: (value) {
                 setState(() {
                   _selectedRole = value!;
+                  // 🔥 3. Xóa Key cũ khi đổi Role để người dùng nhập lại
+                  _secretKeyController.clear();
                 });
               },
+            ),
+
+            const SizedBox(height: 15),
+
+            // 🔥 4. Ô nhập MÃ BÍ MẬT (SECRET KEY) - Mới thêm vào
+            TextField(
+              controller: _secretKeyController,
+              decoration: InputDecoration(
+                labelText: "Mã xác thực cho ${_roles[_selectedRole]}",
+                hintText: "Nhập mã do quản lý cung cấp",
+                prefixIcon: const Icon(
+                  Icons.vpn_key,
+                  color: Colors.orange,
+                ), // Icon chìa khóa
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Colors.orange, width: 2),
+                ),
+                filled: true,
+                fillColor: Colors.orange.withOpacity(
+                  0.08,
+                ), // Màu nền nhẹ cho nổi bật
+              ),
             ),
 
             const SizedBox(height: 15),
