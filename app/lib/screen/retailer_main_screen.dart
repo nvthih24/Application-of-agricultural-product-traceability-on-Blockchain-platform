@@ -73,11 +73,27 @@ class RetailerDashboardTab extends StatefulWidget {
 class _RetailerDashboardTabState extends State<RetailerDashboardTab> {
   List<Map<String, dynamic>> myInventory = [];
   bool _isLoading = false;
+  String _storeName = "Đang tải...";
+  String _storeAddress = "Đang cập nhật...";
 
   @override
   void initState() {
     super.initState();
     _fetchInventoryFromAPI();
+    _loadStoreInfo();
+  }
+
+  // Hàm lấy thông tin từ bộ nhớ máy
+  Future<void> _loadStoreInfo() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      // Lấy tên cửa hàng (companyName), nếu chưa có thì lấy tên người dùng
+      _storeName =
+          prefs.getString('companyName') ??
+          prefs.getString('fullName') ??
+          "Cửa hàng của tôi";
+      _storeAddress = prefs.getString('address') ?? "Chưa cập nhật vị trí";
+    });
   }
 
   // --- API: LOAD DANH SÁCH ---
@@ -450,20 +466,22 @@ class _RetailerDashboardTabState extends State<RetailerDashboardTab> {
       appBar: AppBar(
         backgroundColor: kRetailerColor,
         automaticallyImplyLeading: false,
-        title: const Column(
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              "Quản Lý Siêu Thị",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              _storeName,
+              style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
             ),
-            Text(
-              "WinMart - Chi nhánh 1",
-              style: TextStyle(color: Colors.white70, fontSize: 12),
+            Row(
+              children: [
+                const Icon(Icons.location_on, size: 18, color: Colors.white70),
+                const SizedBox(width: 4),
+                Text(
+                  _storeAddress,
+                  style: const TextStyle(fontSize: 12, color: Colors.white70),
+                ),
+              ],
             ),
           ],
         ),

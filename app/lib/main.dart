@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart';
 // Import các màn hình chính theo vai trò
 import 'screen/home_screen.dart';
 import 'screen/farmer_main_screen.dart';
@@ -7,7 +8,9 @@ import 'screen/transporter_main_screen.dart';
 import 'screen/retailer_main_screen.dart';
 import 'screen/inspector_main_screen.dart'; // Nếu có Moderator
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(const MyApp());
 }
 
@@ -20,7 +23,6 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'AgriTrace',
       theme: ThemeData(primarySwatch: Colors.green, useMaterial3: true),
-      // 🔥 THAY ĐỔI Ở ĐÂY: Thay vì gọi HomeScreen(), ta gọi màn hình khởi động (SplashScreen)
       home: const SplashScreen(),
     );
   }

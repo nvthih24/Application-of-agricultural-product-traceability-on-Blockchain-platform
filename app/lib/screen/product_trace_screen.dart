@@ -237,12 +237,18 @@ class _ProductTraceScreenState extends State<ProductTraceScreen> {
                         _buildInfoRow(
                           Icons.scale,
                           "Sản lượng:",
-                          "Theo lô hàng thực tế",
+                          // Nếu null thì hiện "Đang cập nhật"
+                          (_data!['harvestInfo'] != null)
+                              ? _data!['harvestInfo']['quantity']
+                              : "Đang cập nhật",
                         ),
                         _buildInfoRow(
                           Icons.grade,
                           "Chất lượng:",
-                          "Đạt chuẩn VietGAP",
+                          // Nếu null thì hiện "Đang cập nhật"
+                          (_data!['harvestInfo'] != null)
+                              ? _data!['harvestInfo']['quality']
+                              : "Đang kiểm định",
                         ),
                         if (images['harvest'] != "")
                           _buildImagePreview(images['harvest']),

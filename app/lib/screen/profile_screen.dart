@@ -30,6 +30,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _phoneController = TextEditingController();
   final _farmNameController =
       TextEditingController(); // Dùng chung cho Farm/Company
+  final _addressController = TextEditingController();
 
   bool _isLoggedIn = false;
   bool _isLoading = false;
@@ -78,13 +79,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _emailController.text = data['email'] ?? "";
           _phoneController.text = data['phone'] ?? "";
           _farmNameController.text = data['companyName'] ?? "";
+          _addressController.text = data['address'] ?? "";
 
           _saveToPrefs(data);
         });
       } else {
-        setState(() {
-          _isLoggedIn = false;
-        });
+        if (mounted) {
+          setState(() {
+            _isLoggedIn = false;
+          });
+        }
       }
     } catch (e) {
       print("Lỗi load profile: $e");
@@ -124,6 +128,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await prefs.setString('companyName', user['companyName']);
       await prefs.setString('farmName', user['companyName']);
     }
+    if (user['address'] != null)
+      await prefs.setString('address', user['address']);
   }
 
   // 2. API: CẬP NHẬT PROFILE
@@ -148,6 +154,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         body: jsonEncode({
           "fullName": _nameController.text,
           "companyName": _farmNameController.text,
+          "address": _addressController.text,
         }),
       );
       print("Status Code: ${response.statusCode}");
@@ -327,12 +334,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     true,
                   ), // Readonly
                   // PHẦN RIÊNG CHO FARMER / TRANSPORTER
-                  if (_rawRole == 'farmer' || _rawRole == 'transporter') ...[
+                  if (_rawRole == 'farmer' ||
+                      _rawRole == 'transporter' ||
+                      _rawRole == 'manager') ...[
                     const SizedBox(height: 25),
                     Text(
                       _rawRole == 'farmer'
                           ? "Thông tin Nông trại"
-                          : "Thông tin Doanh nghiệp",
+                          : (_rawRole == 'manager'
+                                ? "Thông tin Cửa hàng"
+                                : "Thông tin Doanh nghiệp"),
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -343,11 +354,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _buildTextField(
                       _rawRole == 'farmer'
                           ? "Tên Nông Trại"
-                          : "Tên Công Ty Vận Tải",
+                          : (_rawRole == 'manager'
+                                ? "Tên Cửa Hàng (VD: WinMart)"
+                                : "Tên Công Ty"),
                       _farmNameController,
-                      _rawRole == 'farmer'
-                          ? Icons.storefront
-                          : Icons.local_shipping,
+                      Icons.store,
+                      false,
+                    ),
+                    const SizedBox(height: 15),
+                    _buildTextField(
+                      "Địa chỉ / Vị trí",
+                      _addressController,
+                      Icons.location_on,
                       false,
                     ),
                   ],

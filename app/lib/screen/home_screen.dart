@@ -23,8 +23,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   static final List<Widget> _widgetOptions = <Widget>[
     const HomeContent(),
-    const Center(child: Text("Đang nâng cấp (Saved)")),
-    const Center(child: Text("Đang nâng cấp (Orders)")),
     const ProfileScreen(),
   ];
 
@@ -40,14 +38,6 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.favorite_border),
-            label: 'Saved',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.receipt_long),
-            label: 'Orders',
-          ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),
             label: 'Profile',

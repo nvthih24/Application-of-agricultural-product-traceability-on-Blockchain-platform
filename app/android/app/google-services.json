@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "500978924596",
+    "project_id": "agritrace-33b77",
+    "storage_bucket": "agritrace-33b77.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:500978924596:android:c2622b6da9b7b4cbb61e61",
+        "android_client_info": {
+          "package_name": "com.example.flutter_app_agricultural_products"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBhDpH0Qbt5YjDJIET_7ERDtNNSyfF44GM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

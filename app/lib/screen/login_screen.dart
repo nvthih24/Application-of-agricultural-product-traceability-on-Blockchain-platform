@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'signup_screen.dart';
 import 'home_screen.dart';
@@ -13,6 +14,7 @@ import 'retailer_main_screen.dart';
 import 'forgot_password_screen.dart';
 
 import '../configs/constants.dart';
+import '../services/api_service.dart';
 
 const Color kPrimaryColor = Color(0xFF00C853); // Màu xanh chủ đạo
 
@@ -52,25 +54,66 @@ class _LoginScreenState extends State<LoginScreen> {
         }),
       );
 
+      print("📡 Server Response Code: ${response.statusCode}");
+      print(
+        "📦 Server Response Body: ${response.body}",
+      ); // 🔥 Quan trọng: Xem nó trả về cái gì
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final String token = data['token'];
-        final String role = data['user']['role'];
-        // Lấy companyName từ JSON (nếu null thì để rỗng)
-        final String companyName = data['user']['companyName'] ?? "";
 
-        // Lưu token và role
+        // --- BẮT ĐẦU XỬ LÝ AN TOÀN (SAFE PARSING) ---
+        // Dùng tring() hoặc ?? "" để tránh lỗi Null
+
+        final String token = data['token']?.toString() ?? "";
+
+        // Kiểm tra xem có object 'user' không
+        final user = data['user'];
+        if (user == null) {
+          _showMsg("Lỗi: Server không trả về thông tin User", isError: true);
+          return;
+        }
+
+        final String userId = user['id']?.toString() ?? ""; // 🔥 Nghi phạm số 1
+        final String role =
+            user['role']?.toString() ?? "farmer"; // Mặc định là farmer nếu lỗi
+        final String fullName =
+            data['fullName']?.toString() ??
+            user['fullName']?.toString() ??
+            "Người dùng"; // Tìm cả 2 chỗ
+        final String companyName = user['companyName']?.toString() ?? "";
+
+        // Kiểm tra nhanh xem có cái nào bị rỗng không
+        if (token.isEmpty || userId.isEmpty) {
+          print("❌ LỖI: Token hoặc ID bị rỗng!");
+          print("Token: $token");
+          print("ID: $userId");
+        }
+
+        // Lưu vào SharedPreferences
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('token', token);
         await prefs.setString('role', role);
-        await prefs.setString('name', data['fullName'] ?? "Người dùng");
-
-        // Lưu tên công ty vào bộ nhớ máy
+        await prefs.setString('name', fullName);
         await prefs.setString('companyName', companyName);
+        await prefs.setString('userId', userId);
+
+        // Gửi FCM Token (Chỉ gửi nếu có userId xịn)
+        if (userId.isNotEmpty) {
+          try {
+            String? fcmToken = await FirebaseMessaging.instance.getToken();
+            if (fcmToken != null) {
+              print("📲 Đang gửi FCM Token: $fcmToken");
+              await saveDeviceToken(userId, fcmToken);
+            }
+          } catch (e) {
+            print("⚠️ Lỗi FCM: $e");
+          }
+        }
+
         if (mounted) {
           _showMsg("Đăng nhập thành công!", isError: false);
 
-          // Điều hướng dựa trên Role
           Widget nextScreen;
           switch (role) {
             case 'farmer':
@@ -99,11 +142,14 @@ class _LoginScreenState extends State<LoginScreen> {
         _showMsg(errorData['msg'] ?? 'Đăng nhập thất bại', isError: true);
       }
     } catch (e) {
-      _showMsg('Lỗi kết nối: $e', isError: true);
+      print("❌ Lỗi Crash App: $e"); // In lỗi ra console để đọc
+      _showMsg('Lỗi xử lý dữ liệu: $e', isError: true);
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
