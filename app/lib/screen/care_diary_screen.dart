@@ -161,7 +161,9 @@ class _CareDiaryScreenState extends State<CareDiaryScreen> {
         SnackBar(content: Text("Lỗi kết nối: $e"), backgroundColor: Colors.red),
       );
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 

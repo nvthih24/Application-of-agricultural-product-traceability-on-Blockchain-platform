@@ -76,9 +76,11 @@ class _AllFarmsScreenState extends State<AllFarmsScreen> {
     } catch (e) {
       print("Lỗi tải nông trại: $e");
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 

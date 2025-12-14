@@ -73,6 +73,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         'password': _passwordController.text,
         'confirmPassword': _confirmPasswordController.text,
         'role': _selectedRole,
+        'secretKey': _secretKeyController.text.trim(),
       };
 
       if (_isSecretKeyRequired) {
@@ -82,7 +83,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({bodyData}),
+        body: jsonEncode(bodyData),
       );
 
       print("Status: ${response.statusCode}");
@@ -106,9 +107,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
     } catch (e) {
       _showMsg("Lỗi kết nối: $e", isError: true);
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 

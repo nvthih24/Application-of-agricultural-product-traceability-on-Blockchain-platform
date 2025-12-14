@@ -210,7 +210,9 @@ class _TransporterDashboardTabState extends State<TransporterDashboardTab> {
     } catch (e) {
       print(e);
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 

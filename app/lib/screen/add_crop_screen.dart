@@ -60,7 +60,11 @@ class _AddCropScreenState extends State<AddCropScreen> {
   Future<void> _pickImage(ImageSource source) async {
     final ImagePicker picker = ImagePicker();
     // Chọn ảnh từ source được truyền vào (Camera hoặc Gallery)
-    final XFile? image = await picker.pickImage(source: source);
+    final XFile? image = await picker.pickImage(
+      source: source,
+      imageQuality: 50,
+      maxWidth: 800,
+    );
 
     if (image != null) {
       setState(() {
@@ -227,7 +231,9 @@ class _AddCropScreenState extends State<AddCropScreen> {
     } catch (e) {
       _showErrorDialog('Lỗi kết nối: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
