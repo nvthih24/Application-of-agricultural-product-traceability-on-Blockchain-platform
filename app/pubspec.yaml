@@ -40,7 +40,7 @@ dependencies:
 
   http: ^1.1.0 # Để gọi API (giống như axios)
   image_picker: ^1.0.4 # Để chọn ảnh/chụp ảnh
-  shared_preferences: ^2.2.2 # Để lưu token (giống như localStorage)
+  shared_preferences: ^2.5.4 # Để lưu token (giống như localStorage)
   mime: ^1.0.4 # (Thư viện phụ) Giúp http xác định loại file ảnh
 
   mobile_scanner: ^5.1.0 # Thư viện quét mã QR

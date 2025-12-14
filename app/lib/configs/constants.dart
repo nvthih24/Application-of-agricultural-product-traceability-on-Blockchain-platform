@@ -1,4 +1,4 @@
 class Constants {
   static const String baseUrl =
-      "https://agritrace-backend-384j.onrender.com/api";
+      "https://server3tmldapp-production.up.railway.app/api";
 }

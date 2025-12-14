@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:http/http.dart' as http;
+
 import 'dart:convert';
+
 import 'qr_scanner_screen.dart';
 import 'farm_detail_screen.dart';
 import 'profile_screen.dart';
 import 'product_trace_screen.dart';
+import 'history_screen.dart';
+import 'all_farms_screen.dart';
+
 import '../configs/constants.dart';
 
 const Color kPrimaryColor = Color(0xFF00C853);
@@ -23,7 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   static final List<Widget> _widgetOptions = <Widget>[
     const HomeContent(),
-    const ProfileScreen(),
+    const HistoryScreen(),
   ];
 
   void _onItemTapped(int index) {
@@ -34,20 +39,133 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kBackgroundColor,
-      body: _widgetOptions.elementAt(_selectedIndex),
-      bottomNavigationBar: BottomNavigationBar(
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            label: 'Profile',
+
+      // 🔥 1. APP BAR MỚI: Đưa Profile và Logo lên đây
+      appBar: AppBar(
+        backgroundColor: kPrimaryColor,
+        elevation: 0,
+        automaticallyImplyLeading: false, // Tắt nút back mặc định
+        title: Row(
+          children: [
+            const CircleAvatar(
+              backgroundImage: AssetImage("assets/images/3TMLNS.ico"),
+              radius: 18,
+              backgroundColor: Colors.white,
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              "3TML FARM",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          // Nút Profile chuyển lên đây
+          Padding(
+            padding: const EdgeInsets.only(right: 15),
+            child: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+                child: const CircleAvatar(
+                  radius: 16,
+                  backgroundColor: Colors.white,
+                  child: Icon(Icons.person, color: kPrimaryColor),
+                ),
+              ),
+            ),
           ),
         ],
-        currentIndex: _selectedIndex,
-        selectedItemColor: kPrimaryColor,
-        unselectedItemColor: Colors.grey,
-        type: BottomNavigationBarType.fixed,
-        onTap: _onItemTapped,
+      ),
+
+      body: _widgetOptions.elementAt(_selectedIndex),
+
+      // 🔥 2. NÚT QUÉT QR NỔI (Điểm nhấn)
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const QrScannerScreen()),
+          );
+        },
+        backgroundColor: Colors.orange, // Màu cam cho nổi bật trên nền xanh
+        elevation: 4,
+        shape: const CircleBorder(),
+        child: const Icon(Icons.qr_code_scanner, size: 30, color: Colors.white),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+
+      // 🔥 3. THANH NAVI CONG (BottomAppBar)
+      bottomNavigationBar: BottomAppBar(
+        shape: const CircularNotchedRectangle(), // Tạo hình lõm
+        notchMargin: 8.0, // Khoảng cách giữa nút nổi và thanh bar
+        color: Colors.white,
+        elevation: 10,
+        child: SizedBox(
+          height: 60,
+          child: Row(
+            mainAxisAlignment:
+                MainAxisAlignment.spaceAround, // Chia đều khoảng cách
+            children: [
+              // Nút TRANG CHỦ (Bên trái)
+              _buildNavItem(
+                icon: Icons.home_rounded,
+                label: "Trang chủ",
+                index: 0,
+              ),
+
+              // Khoảng trống ở giữa cho nút Scan
+              const SizedBox(width: 40),
+
+              // Nút LỊCH SỬ (Bên phải)
+              _buildNavItem(
+                icon: Icons.history_rounded,
+                label: "Lịch sử",
+                index: 1,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem({
+    required IconData icon,
+    required String label,
+    required int index,
+  }) {
+    bool isSelected = _selectedIndex == index;
+    return InkWell(
+      onTap: () => _onItemTapped(index),
+      borderRadius: BorderRadius.circular(30),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: isSelected ? kPrimaryColor : Colors.grey, size: 28),
+          Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? kPrimaryColor : Colors.grey,
+              fontSize: 12,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -131,7 +249,7 @@ class _HomeContentState extends State<HomeContent> {
     try {
       // 1. Lấy danh sách Nông trại
       final resFarms = await http.get(
-        Uri.parse('${Constants.baseUrl}/auth/farmers'),
+        Uri.parse('${Constants.baseUrl}/auth/farmers?page=1&limit=5'),
       );
       if (resFarms.statusCode == 200) {
         final data = jsonDecode(resFarms.body);
@@ -193,33 +311,6 @@ class _HomeContentState extends State<HomeContent> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kBackgroundColor,
-      // APP BAR
-      appBar: AppBar(
-        backgroundColor: kPrimaryColor,
-        elevation: 0,
-        leadingWidth: 60.5,
-        leading: const Padding(
-          padding: EdgeInsets.all(8.0),
-          child: CircleAvatar(
-            backgroundImage: AssetImage("assets/images/3TMLNS.ico"),
-            backgroundColor: Colors.white,
-          ),
-        ),
-        title: const Text(
-          "3TML FARM",
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const QrScannerScreen()),
-            ),
-          ),
-        ],
-      ),
-
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -410,7 +501,7 @@ class _HomeContentState extends State<HomeContent> {
             ],
 
             // 4. DANH SÁCH NÔNG TRẠI (REAL DATA)
-            _buildSectionTitle("🔥 Nông trại tiêu biểu", () {}),
+            _buildSectionTitle("🔥 Nông trại tiêu biểu", null),
 
             _isLoading
                 ? const Center(
@@ -421,14 +512,46 @@ class _HomeContentState extends State<HomeContent> {
                     padding: EdgeInsets.all(30),
                     child: Center(child: Text("Không tìm thấy nông trại nào.")),
                   )
-                : ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _filteredFarms.length,
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    itemBuilder: (context, index) {
-                      return _buildFarmCard(context, _filteredFarms[index]);
-                    },
+                : Column(
+                    children: [
+                      ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        // 🔥 CHỈ HIỆN TỐI ĐA 5 ÔNG THÔI
+                        itemCount: _filteredFarms.length > 5
+                            ? 5
+                            : _filteredFarms.length,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        itemBuilder: (context, index) {
+                          return _buildFarmCard(context, _filteredFarms[index]);
+                        },
+                      ),
+
+                      // 🔥 Nút "Xem tất cả" ở dưới cùng nếu danh sách dài
+                      if (_filteredFarms.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10, bottom: 20),
+                          child: OutlinedButton(
+                            onPressed: () {
+                              // Chuyển sang trang danh sách đầy đủ
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => AllFarmsScreen(),
+                                ),
+                              );
+                            },
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: kPrimaryColor,
+                              side: const BorderSide(color: kPrimaryColor),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                            ),
+                            child: const Text("Xem tất cả nông trại"),
+                          ),
+                        ),
+                    ],
                   ),
 
             const SizedBox(height: 80),
@@ -439,7 +562,7 @@ class _HomeContentState extends State<HomeContent> {
   }
 
   // Widget Tiêu đề
-  Widget _buildSectionTitle(String title, VoidCallback onPress) {
+  Widget _buildSectionTitle(String title, VoidCallback? onPress) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
       child: Row(
@@ -453,10 +576,14 @@ class _HomeContentState extends State<HomeContent> {
               color: kPrimaryColor,
             ),
           ),
-          GestureDetector(
-            onTap: onPress,
-            child: const Text("Xem thêm", style: TextStyle(color: Colors.grey)),
-          ),
+          if (onPress != null)
+            GestureDetector(
+              onTap: onPress,
+              child: const Text(
+                "Xem thêm",
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
         ],
       ),
     );
