@@ -352,6 +352,9 @@ class _RetailerDashboardTabState extends State<RetailerDashboardTab> {
                       final ImagePicker picker = ImagePicker();
                       final XFile? img = await picker.pickImage(
                         source: ImageSource.camera,
+                        preferredCameraDevice: CameraDevice.rear,
+                        imageQuality: 50,
+                        maxWidth: 800,
                       );
                       if (img != null) {
                         setDialogState(() => shelfImage = File(img.path));

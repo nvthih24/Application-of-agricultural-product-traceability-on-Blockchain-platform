@@ -46,7 +46,11 @@ class _CareDiaryScreenState extends State<CareDiaryScreen> {
 
   Future<void> _pickImage() async {
     final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 50,
+      maxWidth: 800,
+    );
     if (image != null) setState(() => _careImage = File(image.path));
   }
 
@@ -138,11 +142,12 @@ class _CareDiaryScreenState extends State<CareDiaryScreen> {
                     label: "Xem",
                     textColor: Colors.white,
                     onPressed: () {
-                      // Mở explorer (ví dụ ZeroScan)
                       launchUrl(
                         Uri.parse(
-                          "https://zeroscan.org/tx/${result['txHash']}",
+                          "https://amoy.polygonscan.com/tx/${result['txHash']}",
                         ),
+                        mode: LaunchMode
+                            .externalApplication, // Mở bằng trình duyệt ngoài
                       );
                     },
                   )

@@ -384,10 +384,17 @@ class _ProductTraceScreenState extends State<ProductTraceScreen> {
                         SizedBox(
                           width: double.infinity,
                           child: OutlinedButton.icon(
-                            onPressed: () {
-                              launchUrl(
-                                Uri.parse("https://zeroscan.org"),
-                              ); // Link demo
+                            onPressed: () async {
+                              // Thêm async để dùng launchUrl an toàn
+                              final Uri url = Uri.parse(
+                                "https://amoy.polygonscan.com",
+                              ); // Link đúng
+                              if (await canLaunchUrl(url)) {
+                                await launchUrl(
+                                  url,
+                                  mode: LaunchMode.externalApplication,
+                                );
+                              }
                             },
                             icon: const Icon(Icons.open_in_new, size: 16),
                             label: const Text("Xác thực trên Blockchain"),

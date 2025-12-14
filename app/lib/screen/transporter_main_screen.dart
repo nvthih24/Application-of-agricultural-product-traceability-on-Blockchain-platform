@@ -327,6 +327,8 @@ class _TransporterDashboardTabState extends State<TransporterDashboardTab> {
                       final XFile? img = await picker.pickImage(
                         source: ImageSource.camera,
                         preferredCameraDevice: CameraDevice.rear,
+                        imageQuality: 50,
+                        maxWidth: 800,
                       );
                       if (img != null) {
                         setDialogState(() => evidenceImage = File(img.path));
