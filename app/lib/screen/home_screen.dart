@@ -767,7 +767,6 @@ class _HomeContentState extends State<HomeContent> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Ảnh sản phẩm (Có Hero Animation cho xịn)
             Hero(
               tag: "product_img_${item['id']}", // Tag duy nhất
               child: ClipRRect(
