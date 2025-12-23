@@ -1,51 +1,49 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
-// Import các màn hình chính theo vai trò
+import 'package:flutter_native_splash/flutter_native_splash.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+
+// Import các màn hình chính
 import 'screen/home_screen.dart';
 import 'screen/farmer_main_screen.dart';
 import 'screen/transporter_main_screen.dart';
 import 'screen/retailer_main_screen.dart';
-import 'screen/inspector_main_screen.dart'; // Nếu có Moderator
+import 'screen/inspector_main_screen.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  // 1. Giữ màn hình chờ (Native Splash) lại, đừng cho nó tắt vội
+  WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+
   await Firebase.initializeApp();
+
+  await Hive.initFlutter();
+  await Hive.openBox('scan_history');
+
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'AgriTrace',
-      theme: ThemeData(primarySwatch: Colors.green, useMaterial3: true),
-      home: const SplashScreen(),
-    );
-  }
+  State<MyApp> createState() => _MyAppState();
 }
 
-// --- TẠO MỘT MÀN HÌNH KHỞI ĐỘNG NHỎ ---
-class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+class _MyAppState extends State<MyApp> {
+  // Biến này sẽ lưu màn hình đích mà user sẽ được đưa tới
+  Widget? _destinationScreen;
 
-  @override
-  State<SplashScreen> createState() => _SplashScreenState();
-}
-
-class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _checkLoginStatus(); // Tự động kiểm tra ngay khi mở app
+    // Bắt đầu kiểm tra đăng nhập ngay khi App vừa khởi tạo
+    _checkLoginAndNavigate();
   }
 
-  Future<void> _checkLoginStatus() async {
-    // Giả vờ đợi 1 giây cho logo hiện lên đẹp (hoặc bỏ dòng này nếu muốn nhanh)
-    await Future.delayed(const Duration(seconds: 1));
+  Future<void> _checkLoginAndNavigate() async {
+    // Không cần delay giả vờ nữa, kiểm tra càng nhanh càng tốt!
 
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
@@ -53,9 +51,9 @@ class _SplashScreenState extends State<SplashScreen> {
 
     Widget nextScreen;
 
-    // Logic điều hướng dựa trên Token và Role đã lưu
+    // Logic điều hướng (Copy từ SplashScreen cũ sang)
     if (token != null && token.isNotEmpty) {
-      print("Đã đăng nhập với vai trò: $role");
+      print("🚀 Auto Login: $role");
       switch (role) {
         case 'farmer':
           nextScreen = const FarmerMainScreen();
@@ -63,43 +61,45 @@ class _SplashScreenState extends State<SplashScreen> {
         case 'transporter':
           nextScreen = const TransporterMainScreen();
           break;
-        case 'manager': // Hoặc 'retailer' tùy code ông lưu
+        case 'manager':
+        case 'retailer':
           nextScreen = const RetailerMainScreen();
           break;
         case 'moderator':
-          nextScreen = const InspectorMainScreen(); // Kiểm duyệt viên
+          nextScreen = const InspectorMainScreen();
           break;
         default:
-          nextScreen = const HomeScreen(); // Role lạ thì về trang khách
+          nextScreen = const HomeScreen();
       }
     } else {
-      print("Chưa đăng nhập -> Vào trang khách");
+      print("🚀 Guest Mode");
       nextScreen = const HomeScreen();
     }
 
     if (!mounted) return;
 
-    // Chuyển hướng và xóa màn hình chờ khỏi lịch sử (để bấm Back không quay lại SplashScreen)
-    Navigator.of(
-      context,
-    ).pushReplacement(MaterialPageRoute(builder: (context) => nextScreen));
+    setState(() {
+      _destinationScreen = nextScreen;
+    });
+
+    // 🔥 QUAN TRỌNG: Sau khi đã xác định xong màn hình đích thì mới cho phép gỡ Native Splash
+    // Lúc này màn hình sẽ chuyển từ [Logo Đứng Yên] -> [Màn hình App] tức thì.
+    FlutterNativeSplash.remove();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Giao diện màn hình chờ (Hiện Logo app)
-    return Scaffold(
-      backgroundColor: Colors.green, // Màu nền thương hiệu
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Icon(Icons.eco, size: 80, color: Colors.white), // Logo cây lúa
-            SizedBox(height: 20),
-            CircularProgressIndicator(color: Colors.white), // Vòng xoay
-          ],
-        ),
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'AgriTrace',
+      theme: ThemeData(
+        primarySwatch: Colors.green,
+        useMaterial3: true,
+        scaffoldBackgroundColor: Colors.white,
       ),
+      // Nếu _destinationScreen chưa có (đang check) -> Hiện màn trắng (nhưng thực tế Native Splash đang che nên user không thấy)
+      // Nếu đã có -> Vào thẳng màn hình đó
+      home: _destinationScreen ?? const Scaffold(backgroundColor: Colors.white),
     );
   }
 }

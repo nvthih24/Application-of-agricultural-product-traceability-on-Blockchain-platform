@@ -13,9 +13,6 @@ import '../configs/constants.dart';
 const Color kInspectorColor = Color(0xFF6A1B9A);
 const Color kInspectorLight = Color(0xFF9C4DCC);
 
-// ==========================================
-// 1. MÀN HÌNH CHÍNH (MENU DƯỚI)
-// ==========================================
 class InspectorMainScreen extends StatefulWidget {
   const InspectorMainScreen({super.key});
 
@@ -60,9 +57,6 @@ class _InspectorMainScreenState extends State<InspectorMainScreen> {
   }
 }
 
-// ==========================================
-// 2. TAB DASHBOARD (CHỜ DUYỆT)
-// ==========================================
 class InspectorDashboardTab extends StatefulWidget {
   const InspectorDashboardTab({super.key});
 
@@ -491,9 +485,6 @@ class _InspectorDashboardTabState extends State<InspectorDashboardTab>
   }
 }
 
-// ==========================================
-// 3. TAB LỊCH SỬ
-// ==========================================
 class InspectorHistoryTab extends StatefulWidget {
   const InspectorHistoryTab({super.key});
 

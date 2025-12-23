@@ -139,6 +139,7 @@ class _AllFarmsScreenState extends State<AllFarmsScreen> {
 
   // Card hiển thị nông trại (Copy từ Home sang cho đồng bộ hoặc custom tùy ý)
   Widget _buildFarmCard(dynamic farm) {
+    String tag = "all_farms_${farm['_id'] ?? farm['phone']}";
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 2,
@@ -148,15 +149,20 @@ class _AllFarmsScreenState extends State<AllFarmsScreen> {
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => FarmDetailScreen(farmData: farm)),
+            MaterialPageRoute(
+              builder: (_) => FarmDetailScreen(farmData: farm, heroTag: tag),
+            ),
           );
         },
-        leading: CircleAvatar(
-          radius: 30,
-          backgroundImage:
-              (farm['avatar'] != null && farm['avatar'].toString().isNotEmpty)
-              ? NetworkImage(farm['avatar'])
-              : const AssetImage('assets/images/farm_1.jpg') as ImageProvider,
+        leading: Hero(
+          tag: tag,
+          child: CircleAvatar(
+            radius: 30,
+            backgroundImage:
+                (farm['avatar'] != null && farm['avatar'].toString().isNotEmpty)
+                ? NetworkImage(farm['avatar'])
+                : const AssetImage('assets/images/farm_1.jpg') as ImageProvider,
+          ),
         ),
         title: Text(
           farm['companyName'] ?? farm['fullName'] ?? "Nông trại",

@@ -44,7 +44,8 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         await Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ProductTraceScreen(productId: code),
+            builder: (context) =>
+                ProductTraceScreen(productId: code, heroTag: "scan_$code"),
           ),
         );
 

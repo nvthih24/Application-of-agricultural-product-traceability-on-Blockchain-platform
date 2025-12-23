@@ -11,8 +11,13 @@ const Color kPrimaryColor = Color(0xFF00C853);
 
 class FarmDetailScreen extends StatefulWidget {
   final Map<String, dynamic> farmData;
+  final String heroTag;
 
-  const FarmDetailScreen({super.key, required this.farmData});
+  const FarmDetailScreen({
+    super.key,
+    required this.farmData,
+    required this.heroTag,
+  });
 
   @override
   State<FarmDetailScreen> createState() => _FarmDetailScreenState();
@@ -51,11 +56,17 @@ class _FarmDetailScreenState extends State<FarmDetailScreen> {
           _isLoading = false;
         });
       } else {
-        setState(() => _isLoading = false);
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
       }
     } catch (e) {
       print("Lỗi kết nối: $e");
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -103,8 +114,7 @@ class _FarmDetailScreenState extends State<FarmDetailScreen> {
                 fit: StackFit.expand,
                 children: [
                   Hero(
-                    tag:
-                        "farm_img_${widget.farmData['_id'] ?? widget.farmData['phone']}", // Tag giống bên Home
+                    tag: widget.heroTag, // Tag giống bên Home
                     child: (avatar != null && avatar.isNotEmpty)
                         ? Image.network(
                             avatar,
@@ -256,13 +266,18 @@ class _FarmDetailScreenState extends State<FarmDetailScreen> {
 
   // Widget Item Sản phẩm
   Widget _buildProductItem(BuildContext context, dynamic product) {
+    String tag = "farm_product_${product['id']}";
     return GestureDetector(
       onTap: () {
         // Bấm vào thì sang trang Truy xuất nguồn gốc (Timeline) luôn cho xịn
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ProductTraceScreen(productId: product['id']),
+            builder: (context) => ProductTraceScreen(
+              productId: product['id'],
+              initialImage: product['image'],
+              heroTag: tag,
+            ),
           ),
         );
       },
