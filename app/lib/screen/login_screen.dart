@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:local_auth/local_auth.dart';
+import 'package:flutter/services.dart';
 
 import 'signup_screen.dart';
 import 'home_screen.dart';
@@ -33,6 +35,59 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
 
+  final LocalAuthentication auth = LocalAuthentication();
+
+  @override
+  void initState() {
+    super.initState();
+    _checkSavedLogin();
+  }
+
+  Future<void> _checkSavedLogin() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedEmail = prefs.getString('saved_email');
+    final savedPass = prefs.getString('saved_password');
+
+    // Nếu có thông tin cũ -> Điền sẵn vào ô
+    if (savedEmail != null && savedPass != null) {
+      setState(() {
+        _emailController.text = savedEmail;
+        _passwordController.text = savedPass;
+      });
+
+      // Đợi 0.5s cho UI ổn định rồi bật quét vân tay luôn
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _authenticateAndAutoLogin();
+      });
+    }
+  }
+
+  // Hàm quét vân tay ĐẶC BIỆT cho trường hợp này
+  Future<void> _authenticateAndAutoLogin() async {
+    // Kiểm tra thiết bị...
+    final bool canAuthenticateWithBiometrics = await auth.canCheckBiometrics;
+    if (!canAuthenticateWithBiometrics) return;
+
+    try {
+      final bool didAuthenticate = await auth.authenticate(
+        localizedReason:
+            'Chào ${_emailController.text}! Quét vân tay để đăng nhập lại.',
+        options: const AuthenticationOptions(
+          stickyAuth: true,
+          biometricOnly: true,
+        ),
+      );
+
+      if (didAuthenticate) {
+        // 🔥 QUÉT ĐÚNG -> GỌI LOGIN LUÔN (Không cần bấm nút)
+        _showMsg("Xác thực thành công! Đang đăng nhập...", isError: false);
+        _login();
+      }
+    } catch (e) {
+      print("Lỗi vân tay: $e");
+    }
+  }
+
   // Hàm xử lý đăng nhập (Giữ nguyên logic phân quyền)
   Future<void> _login() async {
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
@@ -40,9 +95,7 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
       final response = await http.post(
@@ -54,58 +107,40 @@ class _LoginScreenState extends State<LoginScreen> {
         }),
       );
 
-      print("📡 Server Response Code: ${response.statusCode}");
-      print(
-        "📦 Server Response Body: ${response.body}",
-      ); // 🔥 Quan trọng: Xem nó trả về cái gì
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-
-        // --- BẮT ĐẦU XỬ LÝ AN TOÀN (SAFE PARSING) ---
-        // Dùng tring() hoặc ?? "" để tránh lỗi Null
-
         final String token = data['token']?.toString() ?? "";
-
-        // Kiểm tra xem có object 'user' không
         final user = data['user'];
+
         if (user == null) {
           _showMsg("Lỗi: Server không trả về thông tin User", isError: true);
           return;
         }
 
-        final String userId = user['id']?.toString() ?? ""; // 🔥 Nghi phạm số 1
-        final String role =
-            user['role']?.toString() ?? "farmer"; // Mặc định là farmer nếu lỗi
+        final String userId = user['id']?.toString() ?? "";
+        final String role = user['role']?.toString() ?? "farmer";
         final String fullName =
             data['fullName']?.toString() ??
             user['fullName']?.toString() ??
-            "Người dùng"; // Tìm cả 2 chỗ
+            "Người dùng";
         final String companyName = user['companyName']?.toString() ?? "";
 
-        // Kiểm tra nhanh xem có cái nào bị rỗng không
-        if (token.isEmpty || userId.isEmpty) {
-          print("❌ LỖI: Token hoặc ID bị rỗng!");
-          print("Token: $token");
-          print("ID: $userId");
-        }
-
-        // Lưu vào SharedPreferences
+        // Lưu thông tin
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('token', token);
         await prefs.setString('role', role);
         await prefs.setString('name', fullName);
         await prefs.setString('companyName', companyName);
         await prefs.setString('userId', userId);
+        await prefs.setString('saved_email', _emailController.text);
+        await prefs.setString('saved_password', _passwordController.text);
+        await prefs.setBool('is_staff', true);
 
-        // Gửi FCM Token (Chỉ gửi nếu có userId xịn)
+        // Gửi FCM Token
         if (userId.isNotEmpty) {
           try {
             String? fcmToken = await FirebaseMessaging.instance.getToken();
-            if (fcmToken != null) {
-              print("📲 Đang gửi FCM Token: $fcmToken");
-              await saveDeviceToken(userId, fcmToken);
-            }
+            if (fcmToken != null) await saveDeviceToken(userId, fcmToken);
           } catch (e) {
             print("⚠️ Lỗi FCM: $e");
           }
@@ -113,44 +148,90 @@ class _LoginScreenState extends State<LoginScreen> {
 
         if (mounted) {
           _showMsg("Đăng nhập thành công!", isError: false);
-
-          Widget nextScreen;
-          switch (role) {
-            case 'farmer':
-              nextScreen = const FarmerMainScreen();
-              break;
-            case 'transporter':
-              nextScreen = const TransporterMainScreen();
-              break;
-            case 'moderator':
-              nextScreen = const InspectorMainScreen();
-              break;
-            case 'manager':
-              nextScreen = const RetailerMainScreen();
-              break;
-            default:
-              nextScreen = const HomeScreen();
-          }
-
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (context) => nextScreen),
-            (route) => false,
-          );
+          // 🔥 Gọi hàm điều hướng chung (Thay cho đoạn switch case dài dòng cũ)
+          _navigateBasedOnRole(role);
         }
       } else {
         final errorData = jsonDecode(response.body);
         _showMsg(errorData['msg'] ?? 'Đăng nhập thất bại', isError: true);
       }
     } catch (e) {
-      print("❌ Lỗi Crash App: $e"); // In lỗi ra console để đọc
       _showMsg('Lỗi xử lý dữ liệu: $e', isError: true);
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  // 🔥 HÀM XỬ LÝ VÂN TAY
+  Future<void> _authenticate() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    final role = prefs.getString('role');
+
+    // 1. Kiểm tra xem đã từng đăng nhập chưa
+    if (token == null || token.isEmpty || role == null) {
+      _showMsg("Vui lòng đăng nhập bằng mật khẩu lần đầu tiên", isError: true);
+      return;
+    }
+
+    // 2. Kiểm tra thiết bị có hỗ trợ không
+    bool canCheckBiometrics = false;
+    try {
+      canCheckBiometrics = await auth.canCheckBiometrics;
+    } catch (e) {
+      print("Lỗi check vân tay: $e");
+    }
+
+    if (!canCheckBiometrics) {
+      _showMsg("Thiết bị không hỗ trợ vân tay/FaceID", isError: true);
+      return;
+    }
+
+    // 3. Tiến hành quét
+    try {
+      final bool didAuthenticate = await auth.authenticate(
+        localizedReason: 'Quét vân tay để đăng nhập vào AgriTrace',
+        options: const AuthenticationOptions(
+          stickyAuth: true, // Giữ luôn active khi app bị switch
+          biometricOnly: true, // Chỉ dùng sinh trắc học
+        ),
+      );
+
+      // 4. Nếu khớp -> Vào App luôn
+      if (didAuthenticate) {
+        _showMsg("Xác thực thành công!", isError: false);
+        _navigateBasedOnRole(role); // Hàm điều hướng cũ
+      }
+    } on PlatformException catch (e) {
+      print("Lỗi auth: $e");
+      _showMsg("Lỗi xác thực: ${e.message}", isError: true);
+    }
+  }
+
+  // Tách hàm điều hướng ra cho gọn (để dùng chung cho cả Login thường và Vân tay)
+  void _navigateBasedOnRole(String role) {
+    Widget nextScreen;
+    switch (role) {
+      case 'farmer':
+        nextScreen = const FarmerMainScreen();
+        break;
+      case 'transporter':
+        nextScreen = const TransporterMainScreen();
+        break;
+      case 'moderator':
+        nextScreen = const InspectorMainScreen();
+        break;
+      case 'manager':
+        nextScreen = const RetailerMainScreen();
+        break;
+      default:
+        nextScreen = const HomeScreen();
+    }
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => nextScreen),
+      (route) => false,
+    );
   }
 
   void _showMsg(String msg, {bool isError = false}) {
@@ -270,6 +351,35 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
+
+            const SizedBox(height: 20),
+
+            SizedBox(
+              width: double.infinity,
+              height: 55,
+              child: OutlinedButton.icon(
+                onPressed: _authenticate,
+                icon: const Icon(
+                  Icons.fingerprint,
+                  size: 28,
+                  color: kPrimaryColor,
+                ),
+                label: const Text(
+                  "Đăng nhập nhanh bằng Vân tay",
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: kPrimaryColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: kPrimaryColor, width: 1.5),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
 
             const SizedBox(height: 20),
 

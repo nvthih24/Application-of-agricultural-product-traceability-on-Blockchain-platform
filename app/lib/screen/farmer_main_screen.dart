@@ -10,8 +10,10 @@ import 'profile_screen.dart';
 import 'harvest_product_screen.dart';
 import 'care_diary_screen.dart';
 import 'notification_screen.dart';
+import 'qr_scanner_screen.dart';
 
 import '../configs/constants.dart';
+import '../widgets/statistics_chart.dart';
 
 const Color kFarmerPrimaryColor = Color(0xFF2E7D32);
 
@@ -30,9 +32,9 @@ class _FarmerMainScreenState extends State<FarmerMainScreen> {
     const ProfileScreen(),
   ];
 
-  void _onItemTapped(int index) {
-    setState(() => _selectedIndex = index);
-  }
+  // void _onItemTapped(int index) {
+  //   setState(() => _selectedIndex = index);
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +44,7 @@ class _FarmerMainScreenState extends State<FarmerMainScreen> {
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.dashboard),
-            label: 'Dashboard',
+            label: 'Trang chủ',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.notifications),
@@ -53,7 +55,7 @@ class _FarmerMainScreenState extends State<FarmerMainScreen> {
         currentIndex: _selectedIndex,
         selectedItemColor: kFarmerPrimaryColor,
         unselectedItemColor: Colors.grey,
-        onTap: _onItemTapped,
+        onTap: (index) => setState(() => _selectedIndex = index),
         type: BottomNavigationBarType.fixed,
       ),
     );
@@ -70,15 +72,16 @@ class FarmerDashboardTab extends StatefulWidget {
 }
 
 class _FarmerDashboardTabState extends State<FarmerDashboardTab> {
-  bool _isSearching = false;
-  final TextEditingController _searchController = TextEditingController();
-  String _searchKeyword = "";
-  String _selectedStatus = "Tất cả";
+  // bool _isSearching = false;
+  // final TextEditingController _searchController = TextEditingController();
+  // String _searchKeyword = "";
+  // String _selectedStatus = "Tất cả";
 
   List<Map<String, dynamic>> myCrops = [];
   List<Map<String, dynamic>> _foundProducts = [];
   bool isLoading = true;
   String errorMessage = "";
+  List<int> _statsData = [0, 0, 0, 0];
 
   @override
   void initState() {
@@ -117,6 +120,7 @@ class _FarmerDashboardTabState extends State<FarmerDashboardTab> {
           _foundProducts = List.from(myCrops);
           isLoading = false;
         });
+        _calculateRealStats(parsedList);
       } else {
         throw Exception("Lỗi server");
       }
@@ -128,92 +132,125 @@ class _FarmerDashboardTabState extends State<FarmerDashboardTab> {
     }
   }
 
-  void _runFilter() {
-    List<Map<String, dynamic>> results = [];
-    if (_searchKeyword.isEmpty && _selectedStatus == "Tất cả") {
-      results = myCrops;
-    } else {
-      results = myCrops.where((crop) {
-        final matchName = crop["name"].toString().toLowerCase().contains(
-          _searchKeyword.toLowerCase(),
-        );
+  // 🔥 HÀM TÍNH TOÁN DỮ LIỆU THẬT
+  void _calculateRealStats(List<Map<String, dynamic>> products) {
+    int pendingPlant = 0; // Chờ duyệt gieo trồng
+    int farming = 0; // Đang trồng
+    int pendingHarvest = 0; // Chờ duyệt thu hoạch
+    int done = 0; // Hoàn tất
 
-        // Logic lọc hiển thị (dựa trên status text)
-        bool matchStatus = true;
-        if (_selectedStatus != "Tất cả") {
-          String statusText = crop["status"] ?? "";
-          if (_selectedStatus == "Chờ duyệt")
-            matchStatus = statusText.contains("Chờ duyệt");
-          else if (_selectedStatus == "Đang trồng")
-            matchStatus = statusText.contains("Đang");
-          else if (_selectedStatus == "Đã thu hoạch")
-            matchStatus = statusText.contains("Đã");
+    for (var crop in products) {
+      // Logic phân loại GIỐNG HỆT _buildCropCard
+      int pStatus = crop['plantingStatus'] ?? 0;
+      int hStatus = crop['harvestStatus'] ?? 0;
+      int hDate = (crop['harvestDate'] is int) ? crop['harvestDate'] : 0;
+
+      if (pStatus == 0) {
+        pendingPlant++;
+      } else if (pStatus == 1) {
+        if (hDate > 0) {
+          if (hStatus == 0)
+            pendingHarvest++; // Đã bấm thu hoạch, chờ duyệt
+          else if (hStatus == 1)
+            done++; // Đã duyệt xong
+        } else {
+          farming++; // Chưa bấm thu hoạch -> Đang trồng
         }
-
-        return matchName && matchStatus;
-      }).toList();
+      }
     }
-    setState(() => _foundProducts = results);
+
+    // Cập nhật vào biểu đồ
+    setState(() {
+      _statsData = [pendingPlant, farming, pendingHarvest, done];
+    });
   }
 
-  void _showFilterModal() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => StatefulBuilder(
-        builder: (context, setModalState) => Container(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                "Lọc theo trạng thái",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 15),
-              Wrap(
-                spacing: 10,
-                children: ["Tất cả", "Chờ duyệt", "Đang trồng", "Đã thu hoạch"]
-                    .map((s) {
-                      return ChoiceChip(
-                        label: Text(s),
-                        selected: _selectedStatus == s,
-                        selectedColor: kFarmerPrimaryColor,
-                        labelStyle: TextStyle(
-                          color: _selectedStatus == s
-                              ? Colors.white
-                              : Colors.black,
-                        ),
-                        onSelected: (v) {
-                          setState(() => _selectedStatus = s);
-                          setModalState(() {});
-                        },
-                      );
-                    })
-                    .toList(),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: kFarmerPrimaryColor,
-                ),
-                onPressed: () {
-                  _runFilter();
-                  Navigator.pop(context);
-                },
-                child: const Text(
-                  "Áp dụng",
-                  style: TextStyle(color: Colors.white),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  // void _runFilter() {
+  //   List<Map<String, dynamic>> results = [];
+  //   if (_searchKeyword.isEmpty && _selectedStatus == "Tất cả") {
+  //     results = myCrops;
+  //   } else {
+  //     results = myCrops.where((crop) {
+  //       final matchName = crop["name"].toString().toLowerCase().contains(
+  //         _searchKeyword.toLowerCase(),
+  //       );
+
+  //       // Logic lọc hiển thị (dựa trên status text)
+  //       bool matchStatus = true;
+  //       if (_selectedStatus != "Tất cả") {
+  //         String statusText = crop["status"] ?? "";
+  //         if (_selectedStatus == "Chờ duyệt")
+  //           matchStatus = statusText.contains("Chờ duyệt");
+  //         else if (_selectedStatus == "Đang trồng")
+  //           matchStatus = statusText.contains("Đang");
+  //         else if (_selectedStatus == "Đã thu hoạch")
+  //           matchStatus = statusText.contains("Đã");
+  //       }
+
+  //       return matchName && matchStatus;
+  //     }).toList();
+  //   }
+  //   setState(() => _foundProducts = results);
+  // }
+
+  // void _showFilterModal() {
+  //   showModalBottomSheet(
+  //     context: context,
+  //     shape: const RoundedRectangleBorder(
+  //       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+  //     ),
+  //     builder: (_) => StatefulBuilder(
+  //       builder: (context, setModalState) => Container(
+  //         padding: const EdgeInsets.all(20),
+  //         child: Column(
+  //           mainAxisSize: MainAxisSize.min,
+  //           children: [
+  //             const Text(
+  //               "Lọc theo trạng thái",
+  //               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+  //             ),
+  //             const SizedBox(height: 15),
+  //             Wrap(
+  //               spacing: 10,
+  //               children: ["Tất cả", "Chờ duyệt", "Đang trồng", "Đã thu hoạch"]
+  //                   .map((s) {
+  //                     return ChoiceChip(
+  //                       label: Text(s),
+  //                       selected: _selectedStatus == s,
+  //                       selectedColor: kFarmerPrimaryColor,
+  //                       labelStyle: TextStyle(
+  //                         color: _selectedStatus == s
+  //                             ? Colors.white
+  //                             : Colors.black,
+  //                       ),
+  //                       onSelected: (v) {
+  //                         setState(() => _selectedStatus = s);
+  //                         setModalState(() {});
+  //                       },
+  //                     );
+  //                   })
+  //                   .toList(),
+  //             ),
+  //             const SizedBox(height: 20),
+  //             ElevatedButton(
+  //               style: ElevatedButton.styleFrom(
+  //                 backgroundColor: kFarmerPrimaryColor,
+  //               ),
+  //               onPressed: () {
+  //                 _runFilter();
+  //                 Navigator.pop(context);
+  //               },
+  //               child: const Text(
+  //                 "Áp dụng",
+  //                 style: TextStyle(color: Colors.white),
+  //               ),
+  //             ),
+  //           ],
+  //         ),
+  //       ),
+  //     ),
+  //   );
+  // }
 
   // Hàm hiển thị Mã QR
   void _showQrDialog(BuildContext context, String data, String name) {
@@ -286,64 +323,26 @@ class _FarmerDashboardTabState extends State<FarmerDashboardTab> {
 
   @override
   Widget build(BuildContext context) {
-    // TÍNH TOÁN THỐNG KÊ (Dùng logic displayStatus mới để đếm cho chuẩn)
-    // (Ở đây tôi đếm tạm theo logic cũ, ông có thể nâng cấp sau)
-    int total = myCrops.length;
-    int planting = myCrops
-        .where(
-          (c) =>
-              c['plantingStatus'] == 1 &&
-              (c['harvestDate'] == null || c['harvestDate'] == 0),
-        )
-        .length;
-    int harvested = myCrops.where((c) => c['harvestStatus'] == 1).length;
-
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
         backgroundColor: kFarmerPrimaryColor,
-        title: _isSearching
-            ? TextField(
-                controller: _searchController,
-                style: const TextStyle(color: Colors.white),
-                cursorColor: Colors.white,
-                decoration: const InputDecoration(
-                  hintText: "Tìm tên...",
-                  hintStyle: TextStyle(color: Colors.white70),
-                  border: InputBorder.none,
-                ),
-                onChanged: (v) {
-                  _searchKeyword = v;
-                  _runFilter();
-                },
-              )
-            : const Text(
-                "Dashboard Nông Dân",
-                style: TextStyle(color: Colors.white, fontSize: 18),
-              ),
+        elevation: 0,
+        title: const Text(
+          "Quản Lý Nông Trại",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         actions: [
           IconButton(
-            icon: Icon(
-              _isSearching ? Icons.close : Icons.search,
-              color: Colors.white,
-            ),
-            onPressed: () => setState(() {
-              _isSearching = !_isSearching;
-              if (!_isSearching) {
-                _searchKeyword = "";
-                _searchController.clear();
-                _runFilter();
-              }
-            }),
-          ),
-          IconButton(
-            icon: const Icon(Icons.filter_list, color: Colors.white),
-            onPressed: _showFilterModal,
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadMyProducts,
           ),
         ],
       ),
 
-      floatingActionButton: FloatingActionButton.extended(
+      // Floating Button để thêm nhanh
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: kFarmerPrimaryColor,
         onPressed: () async {
           await Navigator.push(
             context,
@@ -351,93 +350,145 @@ class _FarmerDashboardTabState extends State<FarmerDashboardTab> {
           );
           _loadMyProducts();
         },
-        backgroundColor: kFarmerPrimaryColor,
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text("Thêm Mùa Vụ", style: TextStyle(color: Colors.white)),
+        child: const Icon(Icons.add, color: Colors.white),
       ),
 
       body: isLoading
           ? const Center(
               child: CircularProgressIndicator(color: kFarmerPrimaryColor),
             )
-          : errorMessage.isNotEmpty
-          ? Center(
-              child: Text(
-                errorMessage,
-                style: const TextStyle(color: Colors.red),
-              ),
-            )
           : RefreshIndicator(
               onRefresh: _loadMyProducts,
               child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // THỐNG KÊ
-                    Padding(
-                      padding: const EdgeInsets.all(15.0),
-                      child: Row(
-                        children: [
-                          _buildStatCard("Tổng SP", "$total", Colors.blue),
-                          const SizedBox(width: 10),
-                          _buildStatCard(
-                            "Đang trồng",
-                            "$planting",
-                            Colors.orange,
-                          ),
-                          const SizedBox(width: 10),
-                          _buildStatCard("Đã xong", "$harvested", Colors.green),
-                        ],
+                    // 1. BIỂU ĐỒ THỐNG KÊ (MỚI)
+                    const Text(
+                      "Tổng quan năng suất",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
+                    const SizedBox(height: 10),
+                    StatisticsChart(data: _statsData),
 
-                    // TIÊU ĐỀ LIST
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 15,
-                        vertical: 5,
+                    const SizedBox(height: 25),
+
+                    // 2. MENU CHỨC NĂNG NHANH (MỚI)
+                    const Text(
+                      "Tiện ích nhanh",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            "Danh sách sản phẩm",
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          if (_selectedStatus != "Tất cả")
-                            Text(
-                              "Lọc: $_selectedStatus",
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.red,
+                    ),
+                    const SizedBox(height: 10),
+                    GridView.count(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisCount: 2, // 2 cột
+                      childAspectRatio: 1.5, // Hình chữ nhật ngang
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      children: [
+                        _buildQuickAction(
+                          Icons.add_circle,
+                          "Tạo Mùa Vụ",
+                          Colors.orange,
+                          () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const AddCropScreen(),
                               ),
-                            ),
-                        ],
-                      ),
+                            );
+                          },
+                        ),
+                        _buildQuickAction(
+                          Icons.history_edu,
+                          "Nhật Ký",
+                          Colors.blue,
+                          () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  "Tính năng xem toàn bộ nhật ký đang phát triển",
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                        _buildQuickAction(
+                          Icons.qr_code,
+                          "Quét Mã",
+                          Colors.purple,
+                          () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const QrScannerScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                        _buildQuickAction(
+                          Icons.analytics,
+                          "Báo Cáo",
+                          Colors.teal,
+                          () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("Đang tải báo cáo chi tiết..."),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ),
 
-                    // DANH SÁCH
+                    const SizedBox(height: 25),
+
+                    // 3. DANH SÁCH SẢN PHẨM (GIỮ NGUYÊN)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          "Mùa vụ của tôi",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: () {
+                            // Logic mở bộ lọc cũ của ông
+                            // _showFilterModal();
+                          },
+                          icon: const Icon(Icons.filter_list, size: 18),
+                          label: const Text("Bộ lọc"),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
                     _foundProducts.isEmpty
-                        ? const SizedBox(
-                            height: 300,
-                            child: Center(
-                              child: Text(
-                                "Chưa có lô hàng nào\nNhấn + để thêm",
-                              ),
+                        ? const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(20),
+                              child: Text("Chưa có dữ liệu"),
                             ),
                           )
                         : ListView.builder(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
-                            padding: const EdgeInsets.all(15),
                             itemCount: _foundProducts.length,
                             itemBuilder: (_, i) =>
                                 _buildCropCard(_foundProducts[i]),
                           ),
-                    const SizedBox(height: 80),
+                    const SizedBox(height: 60), // Khoảng trống dưới cùng
                   ],
                 ),
               ),
@@ -445,38 +496,69 @@ class _FarmerDashboardTabState extends State<FarmerDashboardTab> {
     );
   }
 
-  Widget _buildStatCard(String title, String count, Color color) {
-    return Expanded(
+  Widget _buildQuickAction(
+    IconData icon,
+    String label,
+    Color color,
+    VoidCallback onTap,
+  ) {
+    return GestureDetector(
+      onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 15),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border(left: BorderSide(color: color, width: 4)),
+          borderRadius: BorderRadius.circular(12),
           boxShadow: [
-            BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 5),
+            BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 4),
           ],
         ),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            Icon(icon, color: color, size: 32),
+            const SizedBox(height: 8),
             Text(
-              count,
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-            const SizedBox(height: 5),
-            Text(
-              title,
-              style: const TextStyle(fontSize: 11, color: Colors.grey),
+              label,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
             ),
           ],
         ),
       ),
     );
   }
+
+  // Widget _buildStatCard(String title, String count, Color color) {
+  //   return Expanded(
+  //     child: Container(
+  //       padding: const EdgeInsets.symmetric(vertical: 15),
+  //       decoration: BoxDecoration(
+  //         color: Colors.white,
+  //         borderRadius: BorderRadius.circular(10),
+  //         border: Border(left: BorderSide(color: color, width: 4)),
+  //         boxShadow: [
+  //           BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 5),
+  //         ],
+  //       ),
+  //       child: Column(
+  //         children: [
+  //           Text(
+  //             count,
+  //             style: TextStyle(
+  //               fontSize: 20,
+  //               fontWeight: FontWeight.bold,
+  //               color: color,
+  //             ),
+  //           ),
+  //           const SizedBox(height: 5),
+  //           Text(
+  //             title,
+  //             style: const TextStyle(fontSize: 11, color: Colors.grey),
+  //           ),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
 
   // --- WIDGET CARD SẢN PHẨM (LOGIC MỚI NHẤT) ---
   Widget _buildCropCard(Map<String, dynamic> crop) {
