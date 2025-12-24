@@ -6,6 +6,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 import 'dart:convert';
 
+import 'product_trace_map_screen.dart';
+
 import '../configs/constants.dart';
 
 class ProductTraceScreen extends StatefulWidget {
@@ -101,6 +103,45 @@ class _ProductTraceScreenState extends State<ProductTraceScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.map_outlined),
+            tooltip: "Xem bản đồ",
+            onPressed: () {
+              if (_data == null) return;
+
+              // Lấy tọa độ từ API (Backend trả về)
+              final farmLoc = _data!['farm']?['location'] ?? {};
+              double lat = double.tryParse(farmLoc['lat'].toString()) ?? 0;
+              double lng = double.tryParse(farmLoc['lng'].toString()) ?? 0;
+
+              // Nếu tọa độ = 0 (chưa có GPS) thì dùng mặc định (Ví dụ: Cần Thơ)
+              if (lat == 0 && lng == 0) {
+                lat = 10.0452;
+                lng = 105.7469;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      "Sản phẩm chưa có GPS, hiển thị vị trí mặc định.",
+                    ),
+                  ),
+                );
+              }
+
+              // Chuyển sang màn hình Map
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProductTraceMapScreen(
+                    farmLat: lat,
+                    farmLng: lng,
+                    // Nếu sau này có tọa độ xe/cửa hàng thì truyền tiếp vào đây
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [

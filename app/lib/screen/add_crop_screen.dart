@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mime/mime.dart';
 import 'package:http_parser/http_parser.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../configs/constants.dart';
 
@@ -183,13 +184,18 @@ class _AddCropScreenState extends State<AddCropScreen> {
     if (_productNameController.text.isEmpty ||
         _seedSourceController.text.isEmpty ||
         _selectedImage == null) {
-      _showErrorDialog('Vui lòng nhập Tên, Nguồn gốc giống và Ảnh.');
+      _showErrorDialog('Vui lòng điền đầy đủ thông tin và chọn ảnh.');
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
+      Position? position = await _determinePosition();
+      if (position == null) {
+        throw Exception("Không lấy được vị trí GPS. Hãy bật quyền vị trí.");
+      }
+
       final String? imageUrl = await _uploadImage(_selectedImage!);
       if (imageUrl == null) {
         _showErrorDialog('Lỗi tải ảnh lên server.');
@@ -219,14 +225,24 @@ class _AddCropScreenState extends State<AddCropScreen> {
           'plantingImageUrl': imageUrl,
           "creatorPhone": prefs.getString('phone'), // lấy từ SharedPreferences
           "creatorName": prefs.getString('name') ?? "Nông dân",
+
+          'lat': position.latitude,
+          'lng': position.longitude,
         }),
       );
 
+      if (!mounted) return;
+
       if (response.statusCode == 200 || response.statusCode == 201) {
-        _showErrorDialog('Khởi tạo mùa vụ thành công!', isError: false);
+        _showErrorDialog('🌱 Khởi tạo mùa vụ thành công!', isError: false);
         Navigator.pop(context); // Quay về Dashboard sau khi xong
       } else {
-        _showErrorDialog('Lỗi server: ${response.body}');
+        final body = jsonDecode(response.body);
+        throw Exception(
+          body['error'] ??
+              body['message'] ??
+              "Lỗi server ${response.statusCode}",
+        );
       }
     } catch (e) {
       _showErrorDialog('Lỗi kết nối: $e');
@@ -235,6 +251,48 @@ class _AddCropScreenState extends State<AddCropScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  Future<Position?> _determinePosition() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    // 1. Kiểm tra GPS có bật không
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Hãy bật GPS (Vị trí) trên điện thoại!')),
+      );
+      return null;
+    }
+
+    // 2. Kiểm tra quyền truy cập
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Quyền truy cập vị trí bị từ chối.')),
+        );
+        return null;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Bạn đã chặn quyền vị trí vĩnh viễn. Hãy vào cài đặt để mở lại.',
+          ),
+        ),
+      );
+      return null;
+    }
+
+    // 3. Lấy vị trí hiện tại (Độ chính xác cao)
+    return await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
   }
 
   void _showErrorDialog(String message, {bool isError = true}) {

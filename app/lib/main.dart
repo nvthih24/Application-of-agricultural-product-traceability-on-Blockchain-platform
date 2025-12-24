@@ -68,13 +68,15 @@ class _MyAppState extends State<MyApp> {
         default:
           nextScreen = const HomeScreen();
       }
-    } else if (isStaff) {
-      // 🟠 2. HẾT HẠN/ĐÃ ĐĂNG XUẤT NHƯNG LÀ MÁY NHÂN VIÊN -> Về Login để quét vân tay
-      print("🔓 Máy nhân viên cũ -> Về Login");
-      nextScreen = const LoginScreen();
-    } else {
+    }
+    // else if (isStaff) {
+    //   // 🟠 2. HẾT HẠN/ĐÃ ĐĂNG XUẤT NHƯNG LÀ MÁY NHÂN VIÊN -> Về Login để quét vân tay
+    //   print("🔓 Máy nhân viên cũ -> Về Login");
+    //   nextScreen = const LoginScreen();
+    // }
+    else {
       // 🔵 3. KHÁCH VÃNG LAI -> Vào Home quét mã
-      print("🌍 Khách mới -> Vào Home");
+      print("🌍 Khách mới / Chưa đăng nhập -> Vào Home");
       nextScreen = const HomeScreen();
     }
 
