@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mime/mime.dart';
 import 'package:http_parser/http_parser.dart';
+import 'package:geolocator/geolocator.dart';
 
 import 'dart:convert';
 import 'dart:io';
@@ -151,9 +152,37 @@ class _TransporterDashboardTabState extends State<TransporterDashboardTab> {
     }
   }
 
+  Future<Position?> _determinePosition() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Hãy bật GPS!')));
+      return null;
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) return null;
+    }
+
+    if (permission == LocationPermission.deniedForever) return null;
+
+    return await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
+  }
+
   // Gọi API Nhận hàng
   Future<void> _callReceiveAPI(String productId, [String? imageUrl]) async {
     setState(() => _isLoading = true);
+    Position? pos = await _determinePosition();
+    double lat = pos?.latitude ?? 0;
+    double lng = pos?.longitude ?? 0;
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
     final companyName = prefs.getString('companyName');
@@ -176,6 +205,8 @@ class _TransporterDashboardTabState extends State<TransporterDashboardTab> {
           "receiveDate": (DateTime.now().millisecondsSinceEpoch / 1000).floor(),
           "receiveImageUrl": imageUrl ?? "",
           "transportInfo": "Xe lạnh (Tài xế: ${fullName ?? 'N/A'})",
+          "lat": lat,
+          "lng": lng,
         }),
       );
 
@@ -219,6 +250,9 @@ class _TransporterDashboardTabState extends State<TransporterDashboardTab> {
   // Gọi API Giao hàng
   Future<void> _confirmDelivery(String productId, [String? imageUrl]) async {
     setState(() => _isLoading = true);
+    Position? pos = await _determinePosition();
+    double lat = pos?.latitude ?? 0;
+    double lng = pos?.longitude ?? 0;
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
     final companyName = prefs.getString('companyName');
@@ -242,6 +276,8 @@ class _TransporterDashboardTabState extends State<TransporterDashboardTab> {
               .floor(),
           "deliveryImageUrl": imageUrl ?? "",
           "transportInfo": "Giao thành công tại kho",
+          "lat": lat,
+          "lng": lng,
         }),
       );
 

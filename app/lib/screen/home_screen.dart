@@ -599,14 +599,6 @@ class _HomeContentState extends State<HomeContent> {
               color: kPrimaryColor,
             ),
           ),
-          if (onPress != null)
-            GestureDetector(
-              onTap: onPress,
-              child: const Text(
-                "Xem thêm",
-                style: TextStyle(color: Colors.grey),
-              ),
-            ),
         ],
       ),
     );

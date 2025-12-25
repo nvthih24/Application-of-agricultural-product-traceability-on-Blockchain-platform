@@ -6,12 +6,10 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 // Import các màn hình
 import 'screen/home_screen.dart';
-import 'screen/login_screen.dart';
 import 'screen/farmer_main_screen.dart';
 import 'screen/transporter_main_screen.dart';
 import 'screen/retailer_main_screen.dart';
 import 'screen/inspector_main_screen.dart';
-import 'configs/constants.dart';
 
 void main() async {
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
@@ -45,7 +43,7 @@ class _MyAppState extends State<MyApp> {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
     final role = prefs.getString('role');
-    final bool isStaff = prefs.getBool('is_staff') ?? false;
+    // final bool isStaff = prefs.getBool('is_staff') ?? false;
 
     Widget nextScreen;
 
