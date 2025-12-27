@@ -275,8 +275,8 @@ class _ProductTraceScreenState extends State<ProductTraceScreen> {
             (log) => _buildTimelineItem(
               title: "Chăm sóc: ${log['type']}",
               time: _formatDate(log['date']),
-              icon: Icons.water_drop,
-              color: Colors.teal,
+              icon: _getActionIcon(log['type']),
+              color: _getActionColor(log['type']),
               content: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -284,7 +284,8 @@ class _ProductTraceScreenState extends State<ProductTraceScreen> {
                     log['desc'],
                     style: const TextStyle(fontStyle: FontStyle.italic),
                   ),
-                  if (log['image'] != "") _buildImagePreview(log['image']),
+                  if (log['image'] != null && log['image'] != "")
+                    _buildImagePreview(log['image']),
                 ],
               ),
               isSmall: true,
@@ -747,5 +748,28 @@ class _ProductTraceScreenState extends State<ProductTraceScreen> {
         ),
       ],
     );
+  }
+
+  // --- HÀM HELPER: Lấy Icon dựa theo tên hoạt động ---
+  IconData _getActionIcon(String? action) {
+    String act = (action ?? "").toLowerCase();
+    if (act.contains("tưới")) return Icons.water_drop;
+    if (act.contains("bón")) return Icons.eco; // Hoặc local_florist
+    if (act.contains("phun") || act.contains("sâu")) return Icons.pest_control;
+    if (act.contains("tỉa") || act.contains("cành")) return Icons.content_cut;
+    if (act.contains("thu hoạch")) return Icons.agriculture;
+    if (act.contains("kiểm tra")) return Icons.search;
+    return Icons.edit_note; // Icon mặc định nếu không khớp
+  }
+
+  // --- HÀM HELPER: Lấy Màu sắc dựa theo tên hoạt động ---
+  Color _getActionColor(String? action) {
+    String act = (action ?? "").toLowerCase();
+    if (act.contains("tưới")) return Colors.blue;
+    if (act.contains("bón")) return Colors.green;
+    if (act.contains("phun") || act.contains("sâu")) return Colors.red;
+    if (act.contains("tỉa")) return Colors.orange;
+    if (act.contains("thu hoạch")) return Colors.amber;
+    return Colors.teal; // Màu mặc định
   }
 }
