@@ -13,7 +13,7 @@ This app connects to the **AgriTrace Backend** to interact with Smart Contracts,
 
 > **Related Repository:**
 >
-> - 🔗 **Backend Server (Node.js & Smart Contracts):** [https://github.com/Baozxje/dAppServer3TMLdApp](https://github.com/Baozxje/dAppServer3TMLdApp)
+> - 🔗 **Backend Server (Node.js & Smart Contracts):** [https://github.com/Baozxje/dAppServer3TML](https://github.com/Baozxje/dAppServer3TML)
 
 ## 📱 Key Features
 
